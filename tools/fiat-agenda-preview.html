@@ -1,0 +1,1046 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Fiat Agenda -- the browser preview rig.
+
+  The same face the Sailfish app draws, in a browser: the main page with its
+  views, the task page, the cover, and both Fiat colour modes. A design rig,
+  not a second product -- when the QML and this file disagree, the QML is the
+  truth.
+
+  Open it straight from the filesystem, or serve it with
+      python3 -m http.server 8000
+  if you want it on the phone over the network.
+-->
+</head>
+<body>
+<title>Fiat Agenda Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600&family=Open+Sans:wght@400;600&display=swap">
+
+<style>
+/* ------------------------------------------------------------------ tokens
+   The bench the phone sits on. Deliberately NOT the Fiat palette -- the cream
+   belongs on the screen, and putting it behind the screen too would leave
+   nothing for the app to be.                                                */
+:root {
+  --bench:      #DFD9DD;
+  --panel:      #EDE8EB;
+  --rule:       rgba(42, 34, 40, 0.18);
+  --ink:        #2A2228;
+  --ink-soft:   #6A6066;
+  --plum:       #6E4A63;
+  --plum-soft:  rgba(110, 74, 99, 0.14);
+  --shadow:     0 24px 60px -24px rgba(30, 26, 18, 0.45);
+
+  --serif: Georgia, "Times New Roman", serif;
+  --ui:    "Open Sans", "Helvetica Neue", Arial, sans-serif;
+  --label: "Archivo", "Helvetica Neue", Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bench:     #171512;
+    --panel:     #211E19;
+    --rule:      rgba(244, 238, 216, 0.14);
+    --ink:       #CFC8B8;
+    --ink-soft:  #8B857A;
+    --plum:      #B98DA9;
+    --plum-soft: rgba(185, 141, 169, 0.16);
+    --shadow:    0 24px 60px -24px rgba(0, 0, 0, 0.8);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bench:     #171512;
+  --panel:     #211E19;
+  --rule:      rgba(244, 238, 216, 0.14);
+  --ink:       #CFC8B8;
+  --ink-soft:  #8B857A;
+  --plum:      #B98DA9;
+  --plum-soft: rgba(185, 141, 169, 0.16);
+  --shadow:    0 24px 60px -24px rgba(0, 0, 0, 0.8);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bench);
+  color: var(--ink);
+  font-family: var(--ui);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* ------------------------------------------------------------------ header */
+
+header { display: flex; flex-direction: column; gap: 6px; }
+
+h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(2rem, 5vw, 2.8rem);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.sub { margin: 0; color: var(--ink-soft); max-width: 62ch; font-size: 0.95rem; }
+
+.eyebrow {
+  font-family: var(--label);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--plum);
+}
+
+/* ------------------------------------------------------------------- stage */
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+}
+
+.rig { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.ctl {
+  font-family: var(--label);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.ctl:hover { color: var(--ink); border-color: var(--ink-soft); }
+.ctl[aria-pressed="true"] {
+  color: var(--plum);
+  border-color: var(--plum);
+  background: var(--plum-soft);
+}
+.ctl:focus-visible { outline: 2px solid var(--plum); outline-offset: 2px; }
+
+/* ------------------------------------------------------------------- phone */
+
+.phone {
+  width: 340px;
+  max-width: 100%;
+  aspect-ratio: 9 / 18;
+  border-radius: 34px;
+  padding: 10px;
+  background: #0E0C09;
+  border: 1px solid rgba(244, 238, 216, 0.12);
+  box-shadow: var(--shadow);
+  position: relative;
+}
+
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 26px;
+  overflow: hidden;
+  font-family: var(--ui);
+  font-size: 14px;
+  line-height: 1.4;
+  isolation: isolate;
+}
+
+/* The three worlds the app can be in. Every colour below is the app's own
+   token, named the way FiatAgendaTheme names it.                            */
+.screen {
+  --f-primary:   #1A1A1A;
+  --f-secondary: rgba(26, 26, 26, 0.55);
+  --f-accent:    #6E4A63;
+  --f-card:      #F5F5F5;
+  --f-hairline:  rgba(26, 26, 26, 0.12);
+  --f-mark:      rgba(26, 26, 26, 0.30);
+  --f-done:      #41682A;
+  --f-duetoday:  #8F4E1B;
+  --f-overdue:   #8A2B25;
+  --f-recess:    rgba(26, 26, 26, 0.05);
+  background: linear-gradient(#F2EFE8, #D8D2C6);
+}
+
+.screen[data-mode="dark"] {
+  --f-primary:   #FFFFFF;
+  --f-secondary: rgba(255, 255, 255, 0.6);
+  --f-accent:    #A0B4D8;
+  --f-card:      #141414;
+  --f-hairline:  rgba(255, 255, 255, 0.14);
+  --f-mark:      rgba(255, 255, 255, 0.3);
+  --f-done:      #7FA65C;
+  --f-duetoday:  #C87941;
+  --f-overdue:   #A0403A;
+  --f-recess:    rgba(255, 255, 255, 0.06);
+  background: #101418 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Crect width='60' height='60' fill='%23141a20'/%3E%3Ccircle cx='30' cy='30' r='26' fill='%2318202a'/%3E%3C/svg%3E") center/180px;
+}
+
+.screen[data-mode="lightamb"] {
+  --f-primary:   #202020;
+  --f-secondary: rgba(32, 32, 32, 0.6);
+  --f-accent:    #6E7BA8;
+  --f-card:      #FAFAFA;
+  --f-hairline:  rgba(32, 32, 32, 0.12);
+  --f-mark:      rgba(32, 32, 32, 0.3);
+  --f-done:      #41682A;
+  --f-duetoday:  #8F4E1B;
+  --f-overdue:   #8A2B25;
+  --f-recess:    rgba(32, 32, 32, 0.05);
+  background: #DDE3E8 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Crect width='60' height='60' fill='%23e2e7ea'/%3E%3Ccircle cx='30' cy='30' r='26' fill='%23d5dce2'/%3E%3C/svg%3E") center/180px;
+}
+
+.app {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--f-primary);
+}
+
+/* ---- the notch, and the row the wordmark shares with it ---- */
+
+.statusrow {
+  height: 26px;
+  flex: 0 0 auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+}
+.cutout {
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  transform: translateX(-50%);
+  width: 74px;
+  height: 20px;
+  border-radius: 0 0 12px 12px;
+  background: #0E0C09;
+}
+.wordmark {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--f-primary);
+}
+
+.scroll { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
+
+.pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 16px 0; }
+.pills.lists { padding-top: 8px; }
+
+.pill {
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 5px 13px;
+  border: 1px solid var(--f-mark);
+  background: color-mix(in srgb, var(--f-primary) 8%, transparent);
+  color: var(--f-primary);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.pill[aria-pressed="true"] {
+  color: var(--f-accent);
+  border-color: color-mix(in srgb, var(--f-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--f-accent) 15%, transparent);
+}
+
+.list { padding: 12px 0 8px; }
+
+/* ---- a task row ---- */
+
+.row { position: relative; overflow: hidden; touch-action: pan-y; }
+.row + .row::before {
+  content: "";
+  position: absolute;
+  left: 16px; right: 16px; top: 0;
+  height: 1px;
+  background: var(--f-hairline);
+}
+
+.hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 12px;
+  opacity: 0;
+  pointer-events: none;
+}
+.hint.done   { justify-content: flex-start; color: var(--f-done);    background: color-mix(in srgb, var(--f-done) 18%, transparent); }
+.hint.delete { justify-content: flex-end;   color: var(--f-overdue); background: color-mix(in srgb, var(--f-overdue) 18%, transparent); }
+
+.rowbody {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  min-height: 54px;
+  background: transparent;
+  cursor: pointer;
+  user-select: none;
+}
+.row.settling .rowbody { transition: transform .12s ease-out; }
+
+.mark {
+  flex: 0 0 auto;
+  width: 17px; height: 17px;
+  border-radius: 50%;
+  border: 2px solid var(--f-mark);
+}
+.mark.today   { border-color: var(--f-duetoday); }
+.mark.overdue { border-color: var(--f-overdue); }
+
+.rowtext { flex: 1 1 auto; min-width: 0; }
+.title {
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
+          mask-image: linear-gradient(90deg, #000 88%, transparent);
+}
+.meta {
+  display: flex;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--f-secondary);
+  margin-top: 1px;
+}
+.meta .due.today   { color: var(--f-duetoday); }
+.meta .due.overdue { color: var(--f-overdue); }
+.meta .rep { color: var(--f-accent); }
+.meta .subs.all { color: var(--f-done); }
+
+.grip {
+  flex: 0 0 auto;
+  width: 26px;
+  display: flex; flex-direction: column; gap: 4px;
+  align-items: center;
+  cursor: grab;
+}
+.grip i { display: block; width: 17px; height: 2px; border-radius: 1px; background: var(--f-mark); }
+.row.lifted { background: var(--f-card); }
+
+/* ---- the remorse timer: the only safety net there is ---- */
+
+.remorse {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 13px;
+  background: var(--f-card);
+  color: var(--f-primary);
+  cursor: pointer;
+}
+.remorse .bar {
+  position: absolute;
+  left: 0; bottom: 0; height: 2px;
+  background: var(--f-accent);
+  animation: drain 4s linear forwards;
+}
+@keyframes drain { from { width: 100%; } to { width: 0%; } }
+@media (prefers-reduced-motion: reduce) {
+  .remorse .bar { animation-duration: 4s; }
+  .row.settling .rowbody { transition: none; }
+}
+
+/* ---- the empty view ---- */
+
+.placeholder {
+  text-align: center;
+  padding: 64px 24px;
+  color: var(--f-secondary);
+}
+.placeholder b { display: block; font-size: 19px; font-weight: 400; color: var(--f-secondary); }
+.placeholder span { font-size: 12px; opacity: .8; }
+
+/* ---- capture, in the thumb zone ---- */
+
+.capture {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--f-hairline);
+  background: var(--f-card);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+}
+.screen[data-mode="fiat"] .capture { background: #D8D2C6; }
+.capture input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  border-bottom: 1px solid var(--f-hairline);
+  background: transparent;
+  color: var(--f-primary);
+  font: inherit;
+  font-size: 14px;
+  padding: 6px 0;
+  outline: none;
+}
+.capture input::placeholder { color: var(--f-secondary); }
+.capture input:focus { border-bottom-color: var(--f-accent); }
+.capture button {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--f-accent); font-size: 22px; line-height: 1;
+  padding: 0 4px; opacity: 0; transition: opacity .15s;
+}
+.capture button.on { opacity: 1; }
+
+/* ---- the task screen ---- */
+
+.taskscreen { padding: 4px 0 24px; }
+.taskscreen h2 {
+  margin: 8px 16px 0;
+  font-size: 21px;
+  font-weight: 400;
+  border-bottom: 1px solid var(--f-hairline);
+  padding-bottom: 6px;
+}
+.section {
+  margin: 18px 16px 6px;
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--f-accent);
+  font-family: var(--label);
+}
+.subrow { display: flex; align-items: center; gap: 12px; padding: 8px 16px; }
+.subrow .mark { width: 14px; height: 14px; }
+.subrow.done .mark { background: var(--f-done); border-color: var(--f-done); }
+.subrow span { font-size: 13px; }
+.subrow.done span { color: var(--f-secondary); }
+.back {
+  margin: 14px 16px 0;
+  font-size: 12px;
+  color: var(--f-secondary);
+  cursor: pointer;
+  background: none; border: none; font-family: inherit; padding: 0;
+}
+
+/* ---- the cover ---- */
+
+.coverwrap { display: grid; place-items: center; height: 100%; }
+.cover {
+  width: 62%;
+  aspect-ratio: 0.72;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  background: linear-gradient(#F2EFE8, #D8D2C6);
+  color: var(--f-primary);
+  box-shadow: 0 10px 30px -12px rgba(0,0,0,.5);
+}
+.screen[data-mode="dark"] .cover     { background: rgba(20,20,20,.85); }
+.screen[data-mode="lightamb"] .cover { background: rgba(250,250,250,.85); }
+.cover .wm { font-family: var(--serif); font-style: italic; font-size: 12px; }
+.cover .fig { font-family: var(--serif); font-size: 46px; line-height: 1.05; }
+.cover .cap { font-size: 11px; color: var(--f-secondary); }
+.cover .next { font-size: 11px; margin-top: 8px; }
+
+/* -------------------------------------------------------------- side notes */
+
+.notes { display: flex; flex-direction: column; gap: 26px; }
+
+.note h3 {
+  margin: 0 0 6px;
+  font-family: var(--label);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.note p { margin: 0 0 8px; font-size: 0.9rem; color: var(--ink-soft); max-width: 58ch; }
+.note p strong { color: var(--ink); font-weight: 600; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.sw { display: flex; align-items: center; gap: 7px; font-size: 0.78rem; color: var(--ink-soft); }
+.sw i { width: 15px; height: 15px; border-radius: 4px; border: 1px solid var(--rule); }
+
+.gestures { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.gestures li { display: flex; gap: 12px; font-size: 0.88rem; color: var(--ink-soft); }
+.gestures b {
+  flex: 0 0 108px;
+  color: var(--ink);
+  font-family: var(--label);
+  font-weight: 500;
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding-top: 2px;
+}
+
+footer {
+  border-top: 1px solid var(--rule);
+  padding-top: 18px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Munkstolen · Fiat family</p>
+    <h1>fiat agenda</h1>
+    <p class="sub">A design rig, not a second product. The same face the Sailfish app draws, in a
+      browser, so the layout and the Fiat colours standard can be judged before anything is built.
+      Swipe the rows, type in the field, throw the ambience switch.</p>
+  </header>
+
+  <div class="stage">
+    <div class="rig">
+      <div class="controls" role="group" aria-label="Colour mode">
+        <button class="ctl" data-mode="fiat" aria-pressed="true">Fiat colours</button>
+        <button class="ctl" data-mode="dark" aria-pressed="false">Ambience · dark</button>
+        <button class="ctl" data-mode="lightamb" aria-pressed="false">Ambience · light</button>
+      </div>
+
+      <div class="phone">
+        <div class="screen" id="screen" data-mode="fiat">
+          <div class="cutout"></div>
+          <div class="app" id="app"></div>
+        </div>
+      </div>
+
+      <div class="controls" role="group" aria-label="Screen">
+        <button class="ctl scr" data-screen="main" aria-pressed="true">Tasks</button>
+        <button class="ctl scr" data-screen="task" aria-pressed="false">One task</button>
+        <button class="ctl scr" data-screen="cover" aria-pressed="false">Cover</button>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note">
+        <h3>The three gestures</h3>
+        <ul class="gestures">
+          <li><b>Swipe right</b><span>Complete, behind the standard SFOS remorse timer. A recurring task says “Next time” instead of “Done”, because it is moved, not finished.</span></li>
+          <li><b>Swipe left</b><span>Delete. A real delete — there is no soft-delete behind it, and the remorse timer is the whole safety net.</span></li>
+          <li><b>Hold</b><span>The two date shortcuts: <em>Not now</em> and <em>No date</em> on a dated task, <em>Due today</em> and <em>Due tomorrow</em> on one without.</span></li>
+          <li><b>Drag the grip</b><span>Reorder — and the grip only appears in Anytime and inside a list, where order is manual. A date-sorted view makes no promise it cannot keep.</span></li>
+          <li><b>Tap</b><span>Open the task: subtasks, list, recurrence, the optional time.</span></li>
+        </ul>
+      </div>
+
+      <div class="note">
+        <h3>Capture inherits the view</h3>
+        <p>Type in <strong>Today</strong> and the task is due today. Type in <strong>Upcoming</strong>
+          and it lands tomorrow. Type inside a list and it joins that list. The placeholder says so
+          out loud — “Add to today” — so it reads as a rule rather than as magic. No dialog stands
+          between the thought and the row.</p>
+      </div>
+
+      <div class="note">
+        <h3>Plum, and what it may never mean</h3>
+        <p>The accent is <strong>#6E4A63</strong>. It marks what is selected, what recurs, what is
+          interactive — and nothing else. Green, amber and red are reserved for meaning: finished,
+          due today, late. An app whose accent could be read as a verdict is an app that says
+          different things in different ambiences.</p>
+        <div class="swatches">
+          <span class="sw"><i style="background:#6E4A63"></i>accent · plum</span>
+          <span class="sw"><i style="background:#41682A"></i>done</span>
+          <span class="sw"><i style="background:#8F4E1B"></i>due today</span>
+          <span class="sw"><i style="background:#8A2B25"></i>overdue</span>
+          <span class="sw"><i style="background:linear-gradient(#F2EFE8,#D8D2C6)"></i>paper</span>
+        </div>
+      </div>
+
+      <div class="note">
+        <h3>Under an ambience, nothing is painted</h3>
+        <p>Throw the switch and the gradient disappears entirely: the wallpaper becomes the
+          background and every colour comes from <strong>Theme.*</strong>. The two ambience modes
+          here stand in for that. The semantic three shift between a dark and a light variant to
+          keep their contrast, and never take the accent's place.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    A browser stand-in for <strong>qml/pages/MainPage.qml</strong>, <strong>TaskPage.qml</strong> and
+    <strong>cover/CoverPage.qml</strong>. Behaviour is faithful; the real thing is Silica, and the
+    remorse timer, the pull-down menu and the keyboard belong to the platform.
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var DAY = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  var MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function iso(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function fromISO(s) {
+    if (!s) return null;
+    var p = s.split("-");
+    return new Date(+p[0], +p[1] - 1, +p[2]);
+  }
+  function today() { var n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+  function todayISO() { return iso(today()); }
+  function addDays(s, n) { var d = fromISO(s); d.setDate(d.getDate() + n); return iso(d); }
+  function daysBetween(a, b) {
+    var x = fromISO(a), y = fromISO(b);
+    x.setHours(12); y.setHours(12);
+    return Math.round((y - x) / 86400000);
+  }
+  function formatDue(due, time) {
+    if (!due) return "";
+    var d = fromISO(due), delta = daysBetween(todayISO(), due), label;
+    if (delta === 0) label = "Today";
+    else if (delta === 1) label = "Tomorrow";
+    else if (delta === -1) label = "Yesterday";
+    else if (delta > 1 && delta < 7) label = DAY[d.getDay()];
+    else if (delta < -1 && delta > -7) label = "Last " + DAY[d.getDay()];
+    else label = d.getDate() + " " + MON[d.getMonth()];
+    return time ? label + " " + time : label;
+  }
+
+  var seq = 100;
+  var tasks = [
+    { id: 1, title: "Ring stämmaren om orgeln", list: "Huset", due: addDays(todayISO(), -2), time: "", rep: 0, unit: "", subDone: 0, subTotal: 0, order: 0 },
+    { id: 2, title: "Vattna växterna", list: "Huset", due: todayISO(), time: "", rep: 3, unit: "day", subDone: 0, subTotal: 0, order: 1 },
+    { id: 3, title: "Läsa protokollet före logen", list: "Logen", due: todayISO(), time: "18:30", rep: 0, unit: "", subDone: 1, subTotal: 3, order: 2 },
+    { id: 4, title: "Boka tågbiljetter", list: "", due: addDays(todayISO(), 2), time: "", rep: 0, unit: "", subDone: 0, subTotal: 0, order: 3 },
+    { id: 5, title: "Rehab — ryggövningar", list: "", due: addDays(todayISO(), 1), time: "07:30", rep: 1, unit: "day", subDone: 0, subTotal: 0, order: 4 },
+    { id: 6, title: "Skriva psalmtexten om Härlig är jorden", list: "Psalmprojektet", due: "", time: "", rep: 0, unit: "", subDone: 0, subTotal: 0, order: 5 },
+    { id: 7, title: "Beställa film till Yashican", list: "", due: "", time: "", rep: 0, unit: "", subDone: 0, subTotal: 0, order: 6 },
+    { id: 8, title: "Städa mörkrummet", list: "Huset", due: "", time: "", rep: 0, unit: "", subDone: 0, subTotal: 0, order: 7 }
+  ];
+
+  var state = { view: "today", list: "", screen: "main", openTask: 3 };
+
+  var app = document.getElementById("app");
+  var screen = document.getElementById("screen");
+
+  function lists() {
+    var seen = [], i;
+    for (i = 0; i < tasks.length; i++)
+      if (tasks[i].list && seen.indexOf(tasks[i].list) < 0) seen.push(tasks[i].list);
+    return seen.sort();
+  }
+
+  function visible() {
+    var t = todayISO(), out;
+    if (state.view === "today")         out = tasks.filter(function (x) { return x.due && x.due <= t; });
+    else if (state.view === "upcoming") out = tasks.filter(function (x) { return x.due && x.due > t; });
+    else if (state.view === "anytime")  out = tasks.filter(function (x) { return !x.due; });
+    else                                out = tasks.filter(function (x) { return x.list === state.list; });
+
+    if (state.view === "today" || state.view === "upcoming")
+      out.sort(function (a, b) {
+        if (a.due !== b.due) return a.due < b.due ? -1 : 1;
+        if (!a.time !== !b.time) return a.time ? -1 : 1;
+        return a.time < b.time ? -1 : 1;
+      });
+    else out.sort(function (a, b) { return a.order - b.order; });
+    return out;
+  }
+
+  var manual = function () { return state.view === "anytime" || state.view === "list"; };
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  // ------------------------------------------------------------- main screen
+
+  function renderMain() {
+    app.innerHTML = "";
+
+    var status = el("div", "statusrow");
+    status.appendChild(el("div", "wordmark", "fiat agenda"));
+    app.appendChild(status);
+
+    var scroll = el("div", "scroll");
+
+    var views = el("div", "pills");
+    [["today", "Today"], ["upcoming", "Upcoming"], ["anytime", "Anytime"]].forEach(function (v) {
+      var b = el("button", "pill", v[1]);
+      b.setAttribute("aria-pressed", state.view === v[0] ? "true" : "false");
+      b.onclick = function () { state.view = v[0]; state.list = ""; render(); };
+      views.appendChild(b);
+    });
+    scroll.appendChild(views);
+
+    var ls = lists();
+    if (ls.length) {
+      var listPills = el("div", "pills lists");
+      ls.forEach(function (name) {
+        var b = el("button", "pill", name);
+        b.setAttribute("aria-pressed", state.view === "list" && state.list === name ? "true" : "false");
+        b.onclick = function () { state.view = "list"; state.list = name; render(); };
+        listPills.appendChild(b);
+      });
+      scroll.appendChild(listPills);
+    }
+
+    var rows = visible();
+    var list = el("div", "list");
+
+    if (!rows.length) {
+      var ph = el("div", "placeholder");
+      ph.appendChild(el("b",
+        state.view === "today" ? "Nothing due today"
+        : state.view === "upcoming" ? "Nothing ahead"
+        : state.view === "anytime" ? "No loose ends"
+        : "This list is empty"));
+      ph.appendChild(el("span", "", "Type below to add one"));
+      list.appendChild(ph);
+    } else {
+      rows.forEach(function (t) { list.appendChild(taskRow(t)); });
+    }
+    scroll.appendChild(list);
+    app.appendChild(scroll);
+
+    // capture
+    var cap = el("div", "capture");
+    var input = document.createElement("input");
+    input.type = "text";
+    input.placeholder =
+      state.view === "today" ? "Add to today"
+      : state.view === "upcoming" ? "Add for tomorrow"
+      : state.view === "anytime" ? "Add a task"
+      : "Add to " + state.list;
+    var plus = el("button", "", "+");
+    plus.setAttribute("aria-label", "Add task");
+
+    function commit() {
+      var v = input.value.replace(/^\s+|\s+$/g, "");
+      if (!v) return;
+      tasks.push({
+        id: ++seq, title: v,
+        list: state.view === "list" ? state.list : "",
+        due: state.view === "today" ? todayISO()
+           : state.view === "upcoming" ? addDays(todayISO(), 1) : "",
+        time: "", rep: 0, unit: "", subDone: 0, subTotal: 0,
+        order: -(++seq)
+      });
+      input.value = "";
+      render();
+      var again = app.querySelector(".capture input");
+      if (again) again.focus();
+    }
+    input.addEventListener("input", function () { plus.className = input.value ? "on" : ""; });
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") commit(); });
+    plus.onclick = commit;
+
+    cap.appendChild(input);
+    cap.appendChild(plus);
+    app.appendChild(cap);
+  }
+
+  function taskRow(t) {
+    var row = el("div", "row");
+    var overdue = t.due && t.due < todayISO();
+    var isToday = t.due === todayISO();
+
+    var hintDone = el("div", "hint done", t.rep ? "Next time" : "Done");
+    var hintDel  = el("div", "hint delete", "Delete");
+    row.appendChild(hintDone);
+    row.appendChild(hintDel);
+
+    var body = el("div", "rowbody");
+    body.appendChild(el("div", "mark" + (overdue ? " overdue" : isToday ? " today" : "")));
+
+    var text = el("div", "rowtext");
+    text.appendChild(el("div", "title", t.title));
+
+    var meta = el("div", "meta");
+    if (t.due) meta.appendChild(el("span", "due" + (overdue ? " overdue" : isToday ? " today" : ""), formatDue(t.due, t.time)));
+    if (t.list && state.view !== "list") meta.appendChild(el("span", "", (t.due ? "· " : "") + t.list));
+    if (t.rep) meta.appendChild(el("span", "rep", "↻"));
+    if (t.subTotal) meta.appendChild(el("span", "subs" + (t.subDone === t.subTotal ? " all" : ""), t.subDone + "/" + t.subTotal));
+    if (meta.childNodes.length) text.appendChild(meta);
+    body.appendChild(text);
+
+    if (manual()) {
+      var grip = el("div", "grip");
+      grip.appendChild(el("i")); grip.appendChild(el("i")); grip.appendChild(el("i"));
+      grip.title = "Drag to reorder";
+      body.appendChild(grip);
+    }
+
+    row.appendChild(body);
+    wireSwipe(row, body, hintDone, hintDel, t);
+    return row;
+  }
+
+  // ----------------------------------------------------------------- gesture
+
+  function wireSwipe(row, body, hintDone, hintDel, t) {
+    var startX = 0, startY = 0, dx = 0, active = false, swiped = false, holdTimer = null;
+
+    function threshold() { return row.clientWidth * 0.28; }
+
+    function paint() {
+      body.style.transform = "translateX(" + dx + "px)";
+      hintDone.style.opacity = dx > 0 ? Math.min(1, dx / threshold()) : 0;
+      hintDel.style.opacity  = dx < 0 ? Math.min(1, -dx / threshold()) : 0;
+    }
+
+    body.addEventListener("pointerdown", function (e) {
+      if (e.target.closest(".grip")) return;
+      active = true; swiped = false; dx = 0;
+      startX = e.clientX; startY = e.clientY;
+      row.classList.remove("settling");
+      body.setPointerCapture(e.pointerId);
+      holdTimer = setTimeout(function () { if (!swiped) showMenu(t); }, 600);
+    });
+
+    body.addEventListener("pointermove", function (e) {
+      if (!active) return;
+      var mx = e.clientX - startX, my = e.clientY - startY;
+      if (!swiped && Math.abs(mx) > 8 && Math.abs(mx) > Math.abs(my)) swiped = true;
+      if (!swiped) return;
+      clearTimeout(holdTimer);
+      dx = mx;
+      paint();
+    });
+
+    function release() {
+      if (!active) return;
+      active = false;
+      clearTimeout(holdTimer);
+      var travelled = dx;
+      row.classList.add("settling");
+      dx = 0; paint();
+      if (travelled > threshold())       remorse(row, t, "complete");
+      else if (travelled < -threshold()) remorse(row, t, "delete");
+      else if (!swiped) { state.screen = "task"; state.openTask = t.id; render(); }
+      swiped = false;
+    }
+    body.addEventListener("pointerup", release);
+    body.addEventListener("pointercancel", function () { active = false; clearTimeout(holdTimer); dx = 0; row.classList.add("settling"); paint(); });
+  }
+
+  function showMenu(t) {
+    var opts = t.due ? ["Not now", "No date"] : ["Due today", "Due tomorrow"];
+    var pick = window.prompt("Hold menu\n1 = " + opts[0] + "\n2 = " + opts[1], "1");
+    if (pick === "1") {
+      if (t.due) t.due = addDays(t.due < todayISO() ? todayISO() : t.due, 1);
+      else t.due = todayISO();
+    } else if (pick === "2") {
+      if (t.due) { t.due = ""; t.time = ""; }
+      else t.due = addDays(todayISO(), 1);
+    }
+    render();
+  }
+
+  // The remorse timer, as close as a browser gets: the row is covered, the
+  // action is named, and a tap anywhere on it calls the whole thing off.
+  function remorse(row, t, action) {
+    var bar = el("div", "remorse");
+    bar.appendChild(el("span", "", action === "delete" ? "Deleting"
+                                : t.rep ? "Moving to its next day" : "Done"));
+    bar.appendChild(el("span", "", "tap to undo"));
+    bar.appendChild(el("div", "bar"));
+    row.appendChild(bar);
+
+    var timer = setTimeout(function () {
+      if (action === "delete" || !t.rep) {
+        tasks = tasks.filter(function (x) { return x.id !== t.id; });
+      } else {
+        var next = addDays(t.due, t.unit === "week" ? t.rep * 7 : t.rep);
+        while (next <= todayISO()) next = addDays(next, t.unit === "week" ? t.rep * 7 : t.rep);
+        t.due = next;
+        t.subDone = 0;
+      }
+      render();
+    }, 4000);
+
+    bar.onclick = function (e) {
+      e.stopPropagation();
+      clearTimeout(timer);
+      row.removeChild(bar);
+    };
+  }
+
+  // ------------------------------------------------------------- task screen
+
+  function renderTask() {
+    var t = null, i;
+    for (i = 0; i < tasks.length; i++) if (tasks[i].id === state.openTask) t = tasks[i];
+    if (!t) t = tasks[0];
+
+    app.innerHTML = "";
+    var status = el("div", "statusrow");
+    status.appendChild(el("div", "wordmark", "fiat agenda"));
+    app.appendChild(status);
+
+    var scroll = el("div", "scroll");
+    var wrap = el("div", "taskscreen");
+
+    var back = el("button", "back", "‹ back to the list");
+    back.onclick = function () { state.screen = "main"; render(); };
+    wrap.appendChild(back);
+
+    wrap.appendChild(el("h2", "", t.title));
+
+    wrap.appendChild(el("div", "section", "Due"));
+    wrap.appendChild(pillRow([
+      ["No date", !t.due, function () { t.due = ""; t.time = ""; t.rep = 0; }],
+      ["Today", t.due === todayISO(), function () { t.due = todayISO(); }],
+      ["Tomorrow", t.due === addDays(todayISO(), 1), function () { t.due = addDays(todayISO(), 1); }],
+      [t.due && t.due !== todayISO() && t.due !== addDays(todayISO(), 1)
+        ? formatDue(t.due, "") : "Pick a day", false, function () {}]
+    ]));
+
+    if (t.due) {
+      wrap.appendChild(pillRow([
+        ["No time", !t.time, function () { t.time = ""; }],
+        [t.time || "Pick a time", !!t.time, function () { t.time = t.time ? "" : "09:00"; }]
+      ]));
+
+      wrap.appendChild(el("div", "section", "Repeat"));
+      wrap.appendChild(pillRow([
+        ["Never", !t.rep, function () { t.rep = 0; t.unit = ""; }],
+        ["Daily", t.rep === 1 && t.unit === "day", function () { t.rep = 1; t.unit = "day"; }],
+        ["Weekly", t.rep === 1 && t.unit === "week", function () { t.rep = 1; t.unit = "week"; }],
+        ["Monthly", t.rep === 1 && t.unit === "month", function () { t.rep = 1; t.unit = "month"; }],
+        [t.rep > 1 ? "Every " + t.rep + " " + t.unit + "s" : "Every …", t.rep > 1,
+          function () { t.rep = 3; t.unit = "day"; }]
+      ]));
+    }
+
+    wrap.appendChild(el("div", "section", "List"));
+    var listOpts = [["None", !t.list, function () { t.list = ""; }]];
+    lists().forEach(function (n) {
+      listOpts.push([n, t.list === n, function () { t.list = n; }]);
+    });
+    listOpts.push(["New …", false, function () {}]);
+    wrap.appendChild(pillRow(listOpts));
+
+    wrap.appendChild(el("div", "section", "Subtasks"));
+    var subs = t.subTotal
+      ? ["Skriva ut dagordningen", "Kolla kalendern", "Ladda telefonen"]
+      : [];
+    subs.forEach(function (s, k) {
+      var r = el("div", "subrow" + (k < t.subDone ? " done" : ""));
+      r.appendChild(el("div", "mark"));
+      r.appendChild(el("span", "", s));
+      r.onclick = function () { t.subDone = k < t.subDone ? k : k + 1; render(); };
+      wrap.appendChild(r);
+    });
+    var add = el("div", "subrow");
+    add.appendChild(el("div", "mark"));
+    add.appendChild(el("span", "", t.subTotal ? "Add subtask" : "Add subtask — one level, and no way to go deeper"));
+    add.style.opacity = ".5";
+    wrap.appendChild(add);
+
+    scroll.appendChild(wrap);
+    app.appendChild(scroll);
+  }
+
+  function pillRow(items) {
+    var row = el("div", "pills");
+    items.forEach(function (it) {
+      var b = el("button", "pill", it[0]);
+      b.setAttribute("aria-pressed", it[1] ? "true" : "false");
+      b.onclick = function () { it[2](); render(); };
+      row.appendChild(b);
+    });
+    return row;
+  }
+
+  // ------------------------------------------------------------------- cover
+
+  function renderCover() {
+    app.innerHTML = "";
+    var t = todayISO();
+    var due = tasks.filter(function (x) { return x.due && x.due <= t; });
+    var late = tasks.filter(function (x) { return x.due && x.due < t; });
+    var next = tasks.filter(function (x) { return x.due; })
+                    .sort(function (a, b) { return a.due < b.due ? -1 : 1; })[0];
+
+    var wrap = el("div", "coverwrap");
+    var c = el("div", "cover");
+    c.appendChild(el("div", "wm", "fiat agenda"));
+    var fig = el("div", "fig", String(due.length));
+    fig.style.color = late.length ? "var(--f-overdue)" : due.length ? "var(--f-duetoday)" : "var(--f-mark)";
+    c.appendChild(fig);
+    c.appendChild(el("div", "cap",
+      !due.length ? "clear" : late.length ? "due · " + late.length + " late" : "due today"));
+    if (next) c.appendChild(el("div", "next", next.title));
+    wrap.appendChild(c);
+    app.appendChild(wrap);
+  }
+
+  function render() {
+    if (state.screen === "main") renderMain();
+    else if (state.screen === "task") renderTask();
+    else renderCover();
+
+    document.querySelectorAll(".ctl.scr").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.dataset.screen === state.screen ? "true" : "false");
+    });
+  }
+
+  document.querySelectorAll(".ctl[data-mode]").forEach(function (b) {
+    b.onclick = function () {
+      screen.dataset.mode = b.dataset.mode;
+      document.querySelectorAll(".ctl[data-mode]").forEach(function (o) {
+        o.setAttribute("aria-pressed", o === b ? "true" : "false");
+      });
+    };
+  });
+
+  document.querySelectorAll(".ctl.scr").forEach(function (b) {
+    b.onclick = function () { state.screen = b.dataset.screen; render(); };
+  });
+
+  render();
+})();
+</script>
+
+</body>
+</html>

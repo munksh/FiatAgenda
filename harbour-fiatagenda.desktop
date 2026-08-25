@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+X-Nemo-Application-Type=silica-qt5
+Icon=harbour-fiatagenda
+Exec=/usr/bin/harbour-fiatagenda
+Name=Fiat Agenda
+Comment=A fast, minimal task list
+
+# Keep this block commented out while sideloading -- an unsandboxed app gets
+# hardware and D-Bus access without declaring anything. Before submitting to
+# Chum or the Jolla Store, uncomment it and change Exec above to
+#   Exec=sailjail -p harbour-fiatagenda.desktop /usr/bin/harbour-fiatagenda
+#
+#[X-Sailjail]
+#Permissions=Calendar;Notifications;Alarms
+#OrganizationName=se.munkstolen
+#ApplicationName=harbour-fiatagenda
