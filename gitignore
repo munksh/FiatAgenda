@@ -1,0 +1,27 @@
+# Qt Creator's per-user session state. Never commit these -- they hold
+# absolute paths and kit ids from one machine and confuse the next one.
+*.pro.user
+*.pro.user.*
+
+# Shadow build directories. Qt Creator puts them beside the project rather
+# than inside it, so this is belt and braces -- unless someone points a build
+# at the source tree, and then it saves the repo.
+build-*/
+Makefile
+.qmake.stash
+*.o
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# Packages
+RPMS/
+*.rpm
+*.tar.bz2
+
+# Scratch
+tools/icon-sheet.png
+__pycache__/
+*.pyc
+*~
+.DS_Store
