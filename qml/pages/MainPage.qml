@@ -52,6 +52,23 @@ Page {
     // Coming back from a task page, the completed page, anywhere.
     onStatusChanged: if (status === PageStatus.Active) reload()
 
+    Component.onCompleted: paint()
+
+    // Silica's own chrome -- the virtual keyboard, the menus, field labels and
+    // underlines -- uses the palette it inherited when the page was BUILT.
+    // Setting it on the ApplicationWindow alone is not enough: a page pushed
+    // AFTER the switch was thrown carries the old one, which is why the main
+    // page came out right and this one did not.
+    //
+    // So every page paints itself, on creation and on every later switch.
+    function paint() { FiatAgendaTheme.applyPalette(page) }
+
+    Connections {
+        target: FiatAgendaTheme
+        onAmbientChanged: page.paint()
+    }
+
+
     ListModel { id: taskModel }
 
     // Fiat colours paint their own paper. Under an ambience there is no

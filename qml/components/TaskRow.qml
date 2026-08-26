@@ -72,6 +72,11 @@ ListItem {
     // the way; this is the rest of it.
     menu: Component {
         ContextMenu {
+            // Without this the menu is transparent and the list shows through
+            // its own menu. A 15% accent wash rather than a solid fill: the
+            // family rule is that backgroundColor on a menu paints the whole
+            // panel, so keep it light enough that it tints instead of dimming.
+            backgroundColor: FiatAgendaTheme.highlightWash
             highlightColor: FiatAgendaTheme.accent
 
             MenuItem {
@@ -144,7 +149,7 @@ ListItem {
             color: "transparent"
             border.width: 2
             border.color: row.overdue ? FiatAgendaTheme.overdue
-                        : row.dueToday ? FiatAgendaTheme.dueToday
+                        : row.dueToday ? FiatAgendaTheme.accent
                         : FiatAgendaTheme.markIdle
         }
 
@@ -178,7 +183,7 @@ ListItem {
                     visible: row.dueDate !== ""
                     text: Dates.formatDue(row.dueDate, row.dueTime)
                     color: row.overdue ? FiatAgendaTheme.overdue
-                         : row.dueToday ? FiatAgendaTheme.dueToday
+                         : row.dueToday ? FiatAgendaTheme.accent
                          : FiatAgendaTheme.secondaryText
                     font.pixelSize: Theme.fontSizeExtraSmall
                 }

@@ -64,7 +64,7 @@ CoverBackground {
             horizontalAlignment: Text.AlignHCenter
             text: cover.info.today
             color: cover.info.overdue > 0 ? FiatAgendaTheme.overdue
-                 : cover.info.today > 0   ? FiatAgendaTheme.dueToday
+                 : cover.info.today > 0   ? FiatAgendaTheme.accent
                                           : FiatAgendaTheme.markIdle
             font.pixelSize: Theme.fontSizeHuge
             font.family: FiatAgendaTheme.serif
@@ -109,7 +109,7 @@ CoverBackground {
         anchors.bottomMargin: Theme.paddingLarge
         text: "fiat agenda"
         color: FiatAgendaTheme.secondaryText
-        font.pixelSize: Theme.fontSizeExtraSmall
+        font.pixelSize: Theme.fontSizeTiny
         font.family: FiatAgendaTheme.serif
         font.italic: true
     }

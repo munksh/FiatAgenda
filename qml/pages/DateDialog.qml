@@ -50,6 +50,11 @@ Dialog {
 
     onAccepted: dialog.chosen = Qt.formatDate(picker.date, "yyyy-MM-dd")
 
+    Connections {
+        target: FiatAgendaTheme
+        onAmbientChanged: dialog.paint()
+    }
+
     FiatBackground { }
 
     SilicaFlickable {

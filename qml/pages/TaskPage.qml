@@ -80,9 +80,25 @@ Page {
     // reloaded. Reloading clears the model, which destroys every delegate,
     // which takes a running remorse countdown with it.
     Component.onCompleted: {
+        paint()
         load()
         Storage.loadSubtasks(subModel, taskId)
     }
+
+    // Silica's own chrome -- the virtual keyboard, the menus, field labels and
+    // underlines -- uses the palette it inherited when the page was BUILT.
+    // Setting it on the ApplicationWindow alone is not enough: a page pushed
+    // AFTER the switch was thrown carries the old one, which is why the main
+    // page came out right and this one did not.
+    //
+    // So every page paints itself, on creation and on every later switch.
+    function paint() { FiatAgendaTheme.applyPalette(page) }
+
+    Connections {
+        target: FiatAgendaTheme
+        onAmbientChanged: page.paint()
+    }
+
 
     onStatusChanged: {
         if (status === PageStatus.Activating) load()
@@ -179,16 +195,6 @@ Page {
                 }
             }
 
-            // Times as pills, not a dial.
-            //
-            // Silica's TimePicker drew its dial but none of its digits on the
-            // device, in both colour modes, and exposes nothing to colour --
-            // so it was a control you had to already know how to use. This is
-            // the Fiat Vox reference-pitch page instead: a row of the values
-            // anyone actually picks, tapped once.
-            //
-            // A task due at 18:37 is not a real case. If one ever turns up,
-            // qml/pages/TimeDialog.qml is still in the tree, unused.
             Flow {
                 x: Theme.horizontalPageMargin
                 width: parent.width - Theme.horizontalPageMargin * 2
@@ -200,14 +206,15 @@ Page {
                     selected: page.task !== null && page.task.dueTime === ""
                     onClicked: page.save({ dueTime: "" })
                 }
-
-                Repeater {
-                    model: ["06:00", "07:00", "08:00", "09:00", "10:00", "12:00",
-                            "14:00", "16:00", "17:00", "18:00", "20:00", "21:00"]
-                    Pill {
-                        text: modelData
-                        selected: page.task !== null && page.task.dueTime === modelData
-                        onClicked: page.save({ dueTime: modelData })
+                Pill {
+                    text: (page.task !== null && page.task.dueTime !== "")
+                          ? page.task.dueTime : qsTr("Pick a time")
+                    selected: page.task !== null && page.task.dueTime !== ""
+                    onClicked: {
+                        if (page.task === null) return
+                        var dlg = pageStack.push(Qt.resolvedUrl("TimeDialog.qml"),
+                                                 { chosen: page.task.dueTime })
+                        dlg.accepted.connect(function () { page.save({ dueTime: dlg.chosen }) })
                     }
                 }
             }

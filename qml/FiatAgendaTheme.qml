@@ -130,18 +130,19 @@ QtObject {
 
     // ---- meaning, never decoration ----
     //
-    // TWO verdicts, not three. A task list only judges lateness: this wants
-    // you today, or you are already late. They never follow the ambience or
-    // the accent -- an instrument that said different things in different
-    // wallpapers would not be an instrument.
+    // ONE verdict. Like Fiat Mos, which also has exactly one.
     //
-    // Being DONE is not a verdict, it is a state, so it wears the accent --
-    // the same reasoning Fiat Mos gives for a logged habit. There is
-    // deliberately no green anywhere in this app: green would have to mean
-    // "finished", finished is not a judgement, and a colour that means
-    // nothing is decoration.
-    readonly property color dueToday: dark ? "#C87941" : "#8F4E1B"
-    readonly property color overdue:  dark ? "#A0403A" : "#8A2B25"
+    // The app started with three colours here and lost two of them, both for
+    // the same reason: they were not judgements.
+    //
+    //   done      finished is a state, not a verdict -- accent
+    //   dueToday  today is a fact about the calendar, not about you -- accent
+    //   overdue   you are late. That IS a verdict, and it stays red.
+    //
+    // So green went first and amber followed. What is left never follows the
+    // ambience or the accent: an instrument that said different things in
+    // different wallpapers would not be an instrument.
+    readonly property color overdue: dark ? "#A0403A" : "#8A2B25"
     readonly property color wrong: overdue          // the name the family uses
 
     // The mark you tap to tick something off. Fiat Mos's habit indicator is
