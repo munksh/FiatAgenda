@@ -16,7 +16,7 @@
 .import QtQuick.LocalStorage 2.0 as LS
 .import "Dates.js" as Dates
 
-var SCHEMA = "2"       // bump, add a step to migrate(), never edit an old step
+var SCHEMA = "3"       // bump, add a step to migrate(), never edit an old step
 
 var ready = false
 
@@ -71,6 +71,17 @@ function migrate(d) {
         d = open_()
     }
 
+    // v3: how long before a task is due its reminder should fire, in minutes.
+    // -1 is off. Minutes rather than a timestamp on purpose: a recurring task
+    // moves, and a stored absolute time would go stale the first time it did.
+    // The absolute moment is computed when the calendar event is written.
+    if (d.version === "2") {
+        d.changeVersion("2", "3", function (tx) {
+            tx.executeSql("ALTER TABLE tasks ADD COLUMN remindMinutes INTEGER DEFAULT -1")
+        })
+        d = open_()
+    }
+
     return d
 }
 
@@ -80,7 +91,7 @@ function init() { db() }
 
 // ---------------------------------------------------------------- reading --
 
-var SELECT_ROW = "SELECT t.id, t.title, t.note, t.listName, t.parentId, t.done, t.doneAt, t.dueDate, t.dueTime, t.repeatEvery, t.repeatUnit, t.sortIndex, (SELECT COUNT(*) FROM tasks s WHERE s.parentId = t.id) AS subTotal, (SELECT COUNT(*) FROM tasks s WHERE s.parentId = t.id AND s.done = 1) AS subDone FROM tasks t "
+var SELECT_ROW = "SELECT t.id, t.title, t.note, t.listName, t.parentId, t.done, t.doneAt, t.dueDate, t.dueTime, t.repeatEvery, t.repeatUnit, t.sortIndex, t.exportToCalendar, IFNULL(t.calendarEventId,'') AS calendarEventId, IFNULL(t.remindMinutes,-1) AS remindMinutes, (SELECT COUNT(*) FROM tasks s WHERE s.parentId = t.id) AS subTotal, (SELECT COUNT(*) FROM tasks s WHERE s.parentId = t.id AND s.done = 1) AS subDone FROM tasks t "
 
 // The model role is taskId, not id: `id` is loaded language in a QML
 // delegate, and the one place a reader has to pause is the one place a bug
@@ -92,6 +103,9 @@ function rowToObject(r) {
         dueDate: r.dueDate, dueTime: r.dueTime,
         repeatEvery: r.repeatEvery, repeatUnit: r.repeatUnit,
         sortIndex: r.sortIndex,
+        exportToCalendar: (r.exportToCalendar === undefined ? 0 : r.exportToCalendar),
+        calendarEventId: (r.calendarEventId === undefined ? "" : r.calendarEventId),
+        remindMinutes: (r.remindMinutes === undefined ? -1 : r.remindMinutes),
         subTotal: (r.subTotal === undefined ? 0 : r.subTotal),
         subDone: (r.subDone === undefined ? 0 : r.subDone)
     }
@@ -246,7 +260,8 @@ var TEXT_COLUMNS = ["title", "note", "listName", "dueDate", "dueTime",
 
 var WRITABLE = ["title", "note", "listName", "dueDate", "dueTime",
                 "repeatEvery", "repeatUnit", "done", "doneAt", "sortIndex",
-                "exportToCalendar", "calendarEventId", "remindAt", "alarmCookie"]
+                "exportToCalendar", "calendarEventId", "remindMinutes",
+                "remindAt", "alarmCookie"]
 
 function updateTask(id, fields) {
     var sets = [], args = []
@@ -271,6 +286,32 @@ function deleteTask(id) {
     db().transaction(function (tx) {
         tx.executeSql("DELETE FROM tasks WHERE id = ? OR parentId = ?", [id, id])
     })
+}
+
+// Every calendar event id already spoken for by some task.
+//
+// Used to tell twins apart. Two tasks called the same thing on the same day
+// produce two events with the same label, and the agenda cannot say which is
+// which -- but one of them is already claimed, and the other is the one we
+// just wrote.
+function claimedCalendarIds() {
+    var out = []
+    db().readTransaction(function (tx) {
+        var rs = tx.executeSql("SELECT calendarEventId FROM tasks WHERE IFNULL(calendarEventId,'') != ''", [])
+        for (var i = 0; i < rs.rows.length; i++) out.push(rs.rows.item(i).calendarEventId)
+    })
+    return out
+}
+
+// The calendar event id of a task, read before deleting it. The row is gone by
+// the time the caller can clean up after it, so ask first.
+function calendarIdOf(id) {
+    var out = ""
+    db().readTransaction(function (tx) {
+        var rs = tx.executeSql("SELECT IFNULL(calendarEventId,'') AS c FROM tasks WHERE id = ?", [id])
+        if (rs.rows.length > 0) out = rs.rows.item(0).c
+    })
+    return out
 }
 
 /*

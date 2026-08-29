@@ -40,9 +40,31 @@ Page {
     property int editingSub: -1
     property int pendingSub: -1
 
+    // Set whenever something the calendar event is built from changes, so
+    // leaving the page rewrites the event once instead of on every keystroke.
+    property bool calendarDirty: false
+
+
     allowedOrientations: defaultAllowedOrientations
 
     ListModel { id: subModel }
+
+    // The calendar bridge belongs to the ApplicationWindow, not to this page.
+    //
+    // Writing an event is asynchronous -- the plugin hands the work to a
+    // worker thread over a queued connection -- so the event's id has to be
+    // looked up afterwards, and that takes about a second. A bridge owned by
+    // this page dies WITH this page, and changing a date and going straight
+    // back is exactly the case where the page is torn down mid-lookup. The id
+    // never lands on the task, the next edit has nothing to remove, and a
+    // second event appears beside the first.
+    //
+    // Up on the window it outlives any page, and the window writes the id to
+    // the database itself.
+    function calendarBridge() {
+        if (FiatAgendaTheme.appWindow === null) return null
+        return FiatAgendaTheme.appWindow.calendarBridge()
+    }
 
     function load() {
         task = Storage.getTask(taskId)
@@ -55,9 +77,72 @@ Page {
         intervalSlider.value = task.repeatEvery > 0 ? task.repeatEvery : 1
     }
 
+    // A bare `var` statement is not legal in a QML object body -- only
+    // properties, functions and signal handlers are.
+    readonly property var calendarFields: ["title", "note", "dueDate", "dueTime",
+                                           "remindMinutes", "exportToCalendar"]
+
     function save(fields) {
+        for (var k in fields) {
+            if (calendarFields.indexOf(k) >= 0) calendarDirty = true
+        }
         Storage.updateTask(taskId, fields)
         task = Storage.getTask(taskId)
+    }
+
+    /*
+     * Bring the calendar into line with the task.
+     *
+     * One event per task: saveEvent removes the previous one before writing
+     * the new, so an edit never leaves a second copy behind. Switching export
+     * off removes the event and forgets its id.
+     *
+     * Wrapped, because this is the one place the app talks to something
+     * outside itself. A calendar that is missing, busy or unhappy must cost
+     * the user their reminder, not their task.
+     */
+    function syncCalendar() {
+        calendarDirty = false
+        if (task === null) return
+
+        var wanted = task.exportToCalendar === 1 && task.dueDate !== ""
+
+        // Nothing wanted and nothing to clean up: leave the plugin alone.
+        // This is the path every task that never touches the calendar takes.
+        if (!wanted && task.calendarEventId === "") return
+
+        var bridge = calendarBridge()
+        if (bridge === null) return
+
+        try {
+            if (!wanted) {
+                bridge.removeEvent(task.calendarEventId)
+                save({ calendarEventId: "" })
+                return
+            }
+            var id = bridge.saveEvent(taskId, task.calendarEventId, task.title, task.note,
+                                      task.dueDate, task.dueTime, task.remindMinutes,
+                                      Storage.claimedCalendarIds())
+            // An empty id here is not nothing -- it means the event was
+            // written but could not be identified yet. Keep the old id rather
+            // than overwriting it with "", or the next edit has nothing to
+            // remove and writes a duplicate. eventSaved below fills it in if
+            // the id turns up late.
+            if (id !== "") save({ calendarEventId: id })
+        } catch (e) {
+            console.log("harbour-fiatagenda: calendar unavailable -- " + e)
+        }
+    }
+
+    // A reminder IS a calendar reminder on this platform -- the system fires
+    // it from the event. So asking for one asks for an entry, and the page
+    // says so rather than turning a switch on behind your back.
+    function setReminder(minutes) {
+        var fields = { remindMinutes: minutes }
+        if (minutes >= 0 && task !== null && task.exportToCalendar !== 1)
+            fields.exportToCalendar = 1
+        save(fields)
+        syncCalendar()
     }
 
     // Free text is written back when the field is left, and again when the
@@ -68,7 +153,14 @@ Page {
         var fields = {}
         if (t !== "" && t !== task.title) fields.title = t
         if (noteField.text !== task.note) fields.note = noteField.text
-        if (fields.title !== undefined || fields.note !== undefined) save(fields)
+        if (fields.title !== undefined || fields.note !== undefined) {
+            save(fields)
+            // Rewrite the event NOW, while this page still exists. Deferring
+            // it to Deactivating means the page -- and the calendar bridge
+            // that lives on it -- is being torn down while an asynchronous
+            // save is still in flight.
+            if (calendarDirty) syncCalendar()
+        }
     }
 
     function setRepeat(every, unit) {
@@ -102,7 +194,10 @@ Page {
 
     onStatusChanged: {
         if (status === PageStatus.Activating) load()
-        else if (status === PageStatus.Deactivating) saveTexts()
+        else if (status === PageStatus.Deactivating) {
+            saveTexts()
+            if (calendarDirty) syncCalendar()
+        }
     }
 
     // Fiat colours paint their own paper. Under an ambience there is no
@@ -122,6 +217,14 @@ Page {
                 text: qsTr("Delete task")
                 color: FiatAgendaTheme.wrong
                 onClicked: remorse.execute(qsTr("Deleting"), function () {
+                    // The event goes with the task, after the same delay.
+                    try {
+                        if (page.task !== null && page.task.calendarEventId !== "") {
+                            var bridge = page.calendarBridge()
+                            if (bridge !== null) bridge.removeEvent(page.task.calendarEventId)
+                        }
+                    } catch (e) { }
+                    page.calendarDirty = false
                     Storage.deleteTask(page.taskId)
                     pageStack.pop()
                 })
@@ -166,17 +269,17 @@ Page {
                     selected: page.task !== null && page.task.dueDate === ""
                     // Clearing the date clears the time and the recurrence with
                     // it: a time with no day is not a due date, it is a riddle.
-                    onClicked: page.save({ dueDate: "", dueTime: "", repeatEvery: 0, repeatUnit: "" })
+                    onClicked: { page.save({ dueDate: "", dueTime: "", repeatEvery: 0, repeatUnit: "" }); page.syncCalendar() }
                 }
                 Pill {
                     text: qsTr("Today")
                     selected: page.task !== null && Dates.isToday(page.task.dueDate)
-                    onClicked: page.save({ dueDate: Dates.todayISO() })
+                    onClicked: { page.save({ dueDate: Dates.todayISO() }); page.syncCalendar() }
                 }
                 Pill {
                     text: qsTr("Tomorrow")
                     selected: page.task !== null && page.task.dueDate === Dates.tomorrowISO()
-                    onClicked: page.save({ dueDate: Dates.tomorrowISO() })
+                    onClicked: { page.save({ dueDate: Dates.tomorrowISO() }); page.syncCalendar() }
                 }
                 Pill {
                     property bool isOther: page.task !== null && page.task.dueDate !== ""
@@ -190,7 +293,7 @@ Page {
                         // instance back straight away to hear its accepted().
                         var dlg = pageStack.push(Qt.resolvedUrl("DateDialog.qml"),
                                                  { chosen: page.task.dueDate })
-                        dlg.accepted.connect(function () { page.save({ dueDate: dlg.chosen }) })
+                        dlg.accepted.connect(function () { page.save({ dueDate: dlg.chosen }); page.syncCalendar() })
                     }
                 }
             }
@@ -204,7 +307,7 @@ Page {
                 Pill {
                     text: qsTr("No time")
                     selected: page.task !== null && page.task.dueTime === ""
-                    onClicked: page.save({ dueTime: "" })
+                    onClicked: { page.save({ dueTime: "" }); page.syncCalendar() }
                 }
                 Pill {
                     text: (page.task !== null && page.task.dueTime !== "")
@@ -214,7 +317,7 @@ Page {
                         if (page.task === null) return
                         var dlg = pageStack.push(Qt.resolvedUrl("TimeDialog.qml"),
                                                  { chosen: page.task.dueTime })
-                        dlg.accepted.connect(function () { page.save({ dueTime: dlg.chosen }) })
+                        dlg.accepted.connect(function () { page.save({ dueTime: dlg.chosen }); page.syncCalendar() })
                     }
                 }
             }
@@ -306,6 +409,93 @@ Page {
                         }
                     }
                 }
+            }
+
+            // -- Calendar and reminder ------------------------------------
+            //
+            // Both only exist once the task has a day. An event with no date
+            // is not an event, and a reminder with nothing to remind you of
+            // is an alarm.
+
+            SectionLabel {
+                x: Theme.horizontalPageMargin
+                text: qsTr("Calendar")
+                visible: page.task !== null && page.task.dueDate !== ""
+            }
+
+            Flow {
+                x: Theme.horizontalPageMargin
+                width: parent.width - Theme.horizontalPageMargin * 2
+                spacing: Theme.paddingSmall
+                visible: page.task !== null && page.task.dueDate !== ""
+
+                Pill {
+                    text: qsTr("In calendar")
+                    selected: page.task !== null && page.task.exportToCalendar === 1
+                    onClicked: {
+                        if (page.task === null) return
+                        var on = page.task.exportToCalendar === 1
+                        var fields = { exportToCalendar: on ? 0 : 1 }
+                        // Turning the entry off takes the reminder with it --
+                        // there is nothing left to fire it.
+                        if (on) fields.remindMinutes = -1
+                        page.save(fields)
+                        page.syncCalendar()
+                    }
+                }
+            }
+
+            Label {
+                x: Theme.horizontalPageMargin
+                width: parent.width - Theme.horizontalPageMargin * 2
+                wrapMode: Text.WordWrap
+                font.pixelSize: Theme.fontSizeExtraSmall
+                color: FiatAgendaTheme.secondaryText
+                visible: page.task !== null && page.task.dueDate !== ""
+                          && page.task.exportToCalendar === 1
+                text: page.task !== null && page.task.dueTime !== ""
+                      ? qsTr("An hour in your calendar, at the time it is due.")
+                      : qsTr("A whole-day entry in your calendar, on the day it is due.")
+            }
+
+            SectionLabel {
+                x: Theme.horizontalPageMargin
+                text: qsTr("Remind me")
+                visible: page.task !== null && page.task.dueDate !== ""
+            }
+
+            Flow {
+                x: Theme.horizontalPageMargin
+                width: parent.width - Theme.horizontalPageMargin * 2
+                spacing: Theme.paddingSmall
+                visible: page.task !== null && page.task.dueDate !== ""
+
+                Repeater {
+                    model: [ { m: -1,   t: qsTr("Never") },
+                             { m: 0,    t: qsTr("On time") },
+                             { m: 10,   t: qsTr("10 min") },
+                             { m: 30,   t: qsTr("30 min") },
+                             { m: 60,   t: qsTr("1 hour") },
+                             { m: 1440, t: qsTr("1 day") } ]
+                    Pill {
+                        text: modelData.t
+                        selected: page.task !== null && page.task.remindMinutes === modelData.m
+                        onClicked: page.setReminder(modelData.m)
+                    }
+                }
+            }
+
+            Label {
+                x: Theme.horizontalPageMargin
+                width: parent.width - Theme.horizontalPageMargin * 2
+                wrapMode: Text.WordWrap
+                font.pixelSize: Theme.fontSizeExtraSmall
+                color: FiatAgendaTheme.secondaryText
+                visible: page.task !== null && page.task.dueDate !== ""
+                         && page.task.remindMinutes >= 0
+                text: page.task !== null && page.task.dueTime !== ""
+                      ? qsTr("Before it is due. The calendar entry carries the reminder, so it fires whether or not this app is running.")
+                      : qsTr("Before 09:00 on the day. A whole-day task has no hour of its own, so the morning stands in for one.")
             }
 
             // -- List ----------------------------------------------------------

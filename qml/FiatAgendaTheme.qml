@@ -176,6 +176,12 @@ QtObject {
     // the paper; this keeps the press in the app's own accent.
     readonly property color highlightWash: Theme.rgba(accent, 0.15)
 
+    // The maker's mark and the wordmark under it, at the foot of the about
+    // page. Deliberately NOT the accent: the accent means "this does
+    // something", and a colophon does nothing. It is a signature, so it sits a
+    // shade above the secondary text and stops there.
+    readonly property color makerMark: Theme.rgba(primaryText, 0.55)
+
     // ---- Silica's own chrome ----
     //
     // Menus, pull-down drawers, ComboBox values, TextField labels and

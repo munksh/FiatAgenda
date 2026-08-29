@@ -89,6 +89,25 @@ ListItem {
                 color: FiatAgendaTheme.primaryText
                 onClicked: row.dateShortcut(row.dueDate === "" ? "tomorrow" : "clear")
             }
+
+            // Done and Delete belong here, not only on a swipe.
+            //
+            // Silica's own pair is tap to enter and press-and-hold for a menu.
+            // A horizontal swipe is the PLATFORM's gesture -- it is how you
+            // navigate between pages -- so an app that also uses it for row
+            // actions is borrowing an idiom from somewhere else. The swipes
+            // stay as accelerators, but nothing in this app is now reachable
+            // ONLY by a gesture no other Sailfish app uses.
+            MenuItem {
+                text: row.repeatEvery > 0 ? qsTr("Move to next time") : qsTr("Done")
+                color: FiatAgendaTheme.primaryText
+                onClicked: row.completeWithRemorse()
+            }
+            MenuItem {
+                text: qsTr("Delete")
+                color: FiatAgendaTheme.wrong
+                onClicked: row.deleteWithRemorse()
+            }
         }
     }
 

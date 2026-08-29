@@ -63,7 +63,11 @@ Links:
 %setup -q -n %{name}-%{version}
 
 %build
-%qmake5
+# APP_VERSION is passed through to the .pro, which turns it into a -D for the
+# compiler, which hands it to QML as the `appVersion` context property. The
+# about page therefore shows the version this package was BUILT with, and
+# Version: above stays the only place the number is written.
+%qmake5 APP_VERSION=%{version}
 make %{?_smp_mflags}
 
 %install

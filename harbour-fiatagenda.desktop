@@ -1,17 +1,63 @@
 [Desktop Entry]
 Type=Application
-X-Nemo-Application-Type=silica-qt5
 Icon=harbour-fiatagenda
-Exec=/usr/bin/harbour-fiatagenda
 Name=Fiat Agenda
 Comment=A fast, minimal task list
+Exec=/usr/bin/sailjail -p harbour-fiatagenda.desktop /usr/bin/harbour-fiatagenda
 
-# Keep this block commented out while sideloading -- an unsandboxed app gets
-# hardware and D-Bus access without declaring anything. Before submitting to
-# Chum or the Jolla Store, uncomment it and change Exec above to
-#   Exec=sailjail -p harbour-fiatagenda.desktop /usr/bin/harbour-fiatagenda
+# NOTE: there is deliberately no X-Nemo-Application-Type line.
 #
-#[X-Sailjail]
-#Permissions=Calendar;Notifications;Alarms
-#OrganizationName=se.munkstolen
-#ApplicationName=harbour-fiatagenda
+# It is normally the first thing in a Silica app's desktop file, and taking it
+# out costs about a second of startup because the app is no longer boosted.
+# It has to go. X-Nemo-Application-Type=silica-qt5 hands the launch to
+# mapplauncherd's booster, and the booster starts an app by dlopen()ing it --
+# a pre-warmed Qt process loading main() as a shared object. With Exec
+# pointing at sailjail it tries to dlopen sailjail:
+#
+#     Booster: Loading invoked application failed:
+#       '/usr/bin/sailjail: cannot load executable file dynamically'
+#
+# and the app dies on launch FROM THE ICON ONLY -- over ssh it starts fine,
+# because that path never touches the booster.
+#
+# Putting Exec back to the plain binary fixes the crash and loses the sandbox
+# entirely: the booster does NOT read the block below, so the app runs
+# unsandboxed and the calendar stays shut. Both halves have to change together.
+#
+# This is exactly what /usr/share/applications/jolla-calendar.desktop does:
+#     Exec=/usr/bin/sailjail -p jolla-calendar.desktop /usr/bin/jolla-calendar
+# with no X-Nemo-Application-Type of its own. Measured, not guessed.
+
+[X-Sailjail]
+# Calendar AND Privileged, and the second one is not optional.
+#
+# Privileged has no file in /etc/sailjail/permissions/ -- it is built into
+# sailjail, and it is what lends the app the `privileged` group. Calendar's
+# own permission file only says
+#     mkdir           ${PRIVILEGED}/Calendar
+#     privileged-data Calendar
+# and privileged-data has no group to work with unless Privileged is granted
+# too. Without it firejail builds the mount, fails on "can't chdir to
+# privileged", and the app sees an empty directory and tries to create the
+# calendar database from scratch. jolla-calendar declares both.
+#
+# Harbour caveat: Privileged is not usually accepted for Jolla Store
+# submissions. For sideloading and for Chum it is fine. If Harbour ever
+# becomes the target, the calendar export is the feature that has to change,
+# not this line.
+#
+# Notifications and Alarms are still not here. The reminder rides on the
+# calendar event and the system fires it.
+Permissions=Calendar;Privileged
+
+# These two decide the app's private data directory, and sailjail sets
+# QCoreApplication's organization and application names FROM THEM:
+#     ~/.local/share/se.munkstolen/harbour-fiatagenda/QML/OfflineStorage/
+#
+# se.munkstolen because Fiat Mos already lives there. Started straight from
+# /usr/bin -- which is what Qt Creator's Run button does -- SailfishApp sets
+# both names to the binary name instead and the app reads
+#     ~/.local/share/harbour-fiatagenda/harbour-fiatagenda/
+# with no sandbox and no calendar. Deploy from Qt Creator, launch from the icon.
+OrganizationName=se.munkstolen
+ApplicationName=harbour-fiatagenda

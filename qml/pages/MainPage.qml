@@ -71,6 +71,13 @@ Page {
 
     ListModel { id: taskModel }
 
+    // The calendar bridge belongs to the ApplicationWindow so it outlives any
+    // page -- see the note there.
+    function calendarBridge() {
+        if (FiatAgendaTheme.appWindow === null) return null
+        return FiatAgendaTheme.appWindow.calendarBridge()
+    }
+
     // Fiat colours paint their own paper. Under an ambience there is no
     // background at all -- the wallpaper is the background.
     FiatBackground { }
@@ -100,6 +107,11 @@ Page {
                 text: qsTr("Completed")
                 color: FiatAgendaTheme.primaryText
                 onClicked: pageStack.animatorPush(Qt.resolvedUrl("CompletedPage.qml"))
+            }
+            MenuItem {
+                text: qsTr("About")
+                color: FiatAgendaTheme.primaryText
+                onClicked: pageStack.animatorPush(Qt.resolvedUrl("AboutPage.qml"))
             }
         }
 
@@ -157,17 +169,22 @@ Page {
             }
         }
 
+        // model.<role> goes undefined for a beat when the model is cleared
+        // while its delegates are still alive -- which is every reload. The
+        // string properties then warn "Unable to assign [undefined] to
+        // QString" once per row, per reload. Harmless, but it buries the
+        // warnings that are not.
         delegate: TaskRow {
             width: taskList.width
-            taskId: model.taskId
-            title: model.title
-            listName: model.listName
-            dueDate: model.dueDate
-            dueTime: model.dueTime
-            repeatEvery: model.repeatEvery
-            repeatUnit: model.repeatUnit
-            subTotal: model.subTotal
-            subDone: model.subDone
+            taskId: model.taskId === undefined ? -1 : model.taskId
+            title: model.title === undefined ? "" : model.title
+            listName: model.listName === undefined ? "" : model.listName
+            dueDate: model.dueDate === undefined ? "" : model.dueDate
+            dueTime: model.dueTime === undefined ? "" : model.dueTime
+            repeatEvery: model.repeatEvery === undefined ? 0 : model.repeatEvery
+            repeatUnit: model.repeatUnit === undefined ? "" : model.repeatUnit
+            subTotal: model.subTotal === undefined ? 0 : model.subTotal
+            subDone: model.subDone === undefined ? 0 : model.subDone
 
             showList: page.view !== "list"
             showHandle: page.manualOrder
@@ -183,8 +200,18 @@ Page {
             }
 
             onTaskRemoved: {
+                // Ask for the event id BEFORE the row is gone.
+                var eventId = Storage.calendarIdOf(model.taskId)
                 Storage.deleteTask(model.taskId)
                 taskModel.remove(index)
+                // Only now, and only if there is actually an event, does the
+                // calendar plugin get loaded at all.
+                if (eventId !== "") {
+                    try {
+                        var bridge = page.calendarBridge()
+                        if (bridge !== null) bridge.removeEvent(eventId)
+                    } catch (e) { }
+                }
             }
 
             // The model is already in the new order; the database just has to

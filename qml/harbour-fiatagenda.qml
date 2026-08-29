@@ -49,4 +49,38 @@ ApplicationWindow {
         target: FiatAgendaTheme
         onAmbientChanged: FiatAgendaTheme.applyPalette(app)
     }
+
+    /*
+     * The calendar bridge lives HERE, not on a page.
+     *
+     * Writing an event is asynchronous: the plugin hands the work to a worker
+     * thread with a queued connection, so the event's id has to be looked up
+     * afterwards, which takes about a second. A bridge owned by TaskPage dies
+     * with TaskPage -- and changing a date and going straight back is exactly
+     * the case where the page is torn down mid-lookup. The id then never lands
+     * on the task, the next edit has nothing to remove, and you get a second
+     * event beside the first. That was the duplicate on date change.
+     *
+     * Up here it outlives any page, and the id is written straight to the
+     * database by whoever it belongs to -- no page has to still be alive.
+     *
+     * Still an empty source until something asks: a user who never exports
+     * never loads the plugin.
+     */
+    Loader { id: calendarLoader }
+
+    function calendarBridge() {
+        if (calendarLoader.source == "")
+            calendarLoader.source = Qt.resolvedUrl("components/CalendarBridge.qml")
+        return calendarLoader.item
+    }
+
+    Connections {
+        target: calendarLoader.item
+        ignoreUnknownSignals: true
+        onEventSaved: {
+            if (taskId > 0 && instanceId !== "")
+                Storage.updateTask(taskId, { calendarEventId: instanceId })
+        }
+    }
 }
