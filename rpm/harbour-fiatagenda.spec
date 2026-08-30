@@ -34,7 +34,7 @@ Buy milk. Call the dentist before Friday. Water the plants every Sunday, for
 as long as there are plants.
 
 Most task apps want to know the project, the tag and the priority before they
-will let you write anything down. Fiat Agenda asks for the words. A date is
+will let you write anything down. fiat agenda asks for the words. A date is
 optional, a time is optional, and no date at all is a proper answer rather
 than an unfinished one.
 
@@ -92,7 +92,7 @@ Fourth in the Fiat family, after Fiat Lux (a light meter for film), Fiat Vox
 itself.
 
 %if 0%{?_chum}
-Title: Fiat Agenda
+Title: fiat agenda
 Type: desktop-application
 DeveloperName: Munkstolen
 Categories:

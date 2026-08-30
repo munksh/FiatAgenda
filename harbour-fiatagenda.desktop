@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Icon=harbour-fiatagenda
-Name=Fiat Agenda
+Name=fiat agenda
 Comment=A fast, minimal task list
 Exec=/usr/bin/sailjail -p harbour-fiatagenda.desktop /usr/bin/harbour-fiatagenda
 
