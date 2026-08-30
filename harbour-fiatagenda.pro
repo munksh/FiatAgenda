@@ -82,7 +82,7 @@ SAILFISHAPP_ICONS = 86x86 108x108 128x128 172x172
 #
 # The fallback is deliberately not a plausible version. A build straight out
 # of Qt Creator, with no rpm around it, should SAY it is a development build
-# rather than claim to be 0.1.0.
+# rather than claim to be the release it is not.
 isEmpty(APP_VERSION) {
     APP_VERSION = 0.0.0-dev
 }

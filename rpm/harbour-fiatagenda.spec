@@ -1,6 +1,6 @@
 Name:       harbour-fiatagenda
 Summary:    A fast, minimal task list
-Version:    0.1.0
+Version:    1.0.0
 Release:    1
 License:    MIT
 URL:        https://github.com/munksh/FiatAgenda
@@ -30,20 +30,66 @@ BuildRequires:  desktop-file-utils
 # Every percent sign in a comment in this file is doubled on purpose.
 
 %description
-Fiat Agenda is a personal task list. Fast capture, dates, one level of
-subtasks, simple lists and recurring tasks -- and nothing that would only
-matter to someone managing work across a team.
+Buy milk. Call the dentist before Friday. Water the plants every Sunday, for
+as long as there are plants.
 
-Today and Upcoming are computed from the dates, never curated. Capture
-inherits the view you are standing in: type in Today and the task is due
-today, type inside a list and it joins that list. Deletion is a real delete
-behind the standard remorse timer; there is no hidden history.
+Most task apps want to know the project, the tag and the priority before they
+will let you write anything down. Fiat Agenda asks for the words. A date is
+optional, a time is optional, and no date at all is a proper answer rather
+than an unfinished one.
 
-Everything stays in one file on your phone. No account, no network access,
-no telemetry.
+CAPTURE
+The field is always there at the bottom of the list. Type, press return, done
+-- under two seconds, with nothing you are forced to fill in. Capture inherits
+the view you are standing in: type in Today and the task is due today, type
+inside a list and it joins that list.
 
-Fourth in the Fiat family, after Fiat Lux (a light meter), Fiat Vox (a tuner)
-and Fiat Mos (a habit tracker).
+THE VIEWS
+Today, Upcoming and Anytime are computed from the dates, never curated.
+Overdue tasks belong to Today, because giving them a screen of their own only
+means two lists to read before breakfast. Anytime is a real home for
+everything with no date, in the order you dragged them into.
+
+WHAT A TASK CAN HAVE
+A due date, and optionally a time. One level of subtasks -- enough to break a
+job into steps, not enough to build a tree. A note. A list to belong to. A
+repeat: daily, weekly, monthly or yearly, which advances to the next
+occurrence when you tick it off rather than closing. Defer, to push something
+to tomorrow or next week without opening it.
+
+Press and hold a task for its menu: today, tomorrow, done, delete. Drag to
+reorder wherever manual order makes sense. Completed tasks are kept on their
+own page. Deleting is a real delete, behind the standard remorse timer --
+there is no archive and no hidden copy.
+
+YOUR CALENDAR, IF YOU ASK
+Each task has two independent switches. One writes the task into your calendar
+as an event and keeps it in step: change the day or the time and the old event
+goes rather than a second one appearing. The other sets a reminder, which
+rides on that event, so it arrives whether or not the app is running. A task
+with both switches off never touches your calendar at all.
+
+FIAT COLOURS
+The app follows your ambience out of the box. One item in the pull-down menu
+switches it to Fiat colours instead: the family's own light paper and plum
+accent, the same palette in every Fiat app. The choice is remembered.
+
+WHAT IT IS NOT
+Not a project manager. No time tracking, no pomodoro, no kanban board, no
+plugins, no shared projects, no sync service. If a feature would only matter
+to someone running work across a team, it is not here, and that is the design
+rather than a gap.
+
+YOUR DATA
+Everything stays on this phone, in one file. There is no account, no network
+access, and nothing is measured or reported. The only permission the app asks
+for is your calendar, used only for the switches described above.
+
+THE NAME
+Latin: agenda, the things that must be done. A plural, from agere, to do.
+Fourth in the Fiat family, after Fiat Lux (a light meter for film), Fiat Vox
+(a chromatic tuner) and Fiat Mos (a habit tracker). Every name translates
+itself.
 
 %if 0%{?_chum}
 Title: Fiat Agenda
@@ -54,6 +100,11 @@ Categories:
  - Office
 Custom:
   Repo: https://github.com/munksh/FiatAgenda
+PackageIcon: https://munkstolen.se/SFOS/fiat-agenda/harbour-fiatagenda.png
+Screenshots:
+ - https://munkstolen.se/SFOS/fiat-agenda/fiat-agenda1.png
+ - https://munkstolen.se/SFOS/fiat-agenda/fiat-agenda2.png
+ - https://munkstolen.se/SFOS/fiat-agenda/fiat-agenda3.png
 Links:
   Homepage: https://github.com/munksh/FiatAgenda
   Bugtracker: https://github.com/munksh/FiatAgenda/issues
