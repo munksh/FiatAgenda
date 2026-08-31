@@ -87,8 +87,8 @@ for is your calendar, used only for the switches described above.
 
 THE NAME
 Latin: agenda, the things that must be done. A plural, from agere, to do.
-Fourth in the Fiat family, after Fiat Lux (a light meter for film), Fiat Vox
-(a chromatic tuner) and Fiat Mos (a habit tracker). Every name translates
+Fourth in the Fiat family, after fiat lux (a light meter for film), fiat vox
+(a chromatic tuner) and fiat mos (a habit tracker). Every name translates
 itself.
 
 %if 0%{?_chum}
@@ -130,6 +130,10 @@ desktop-file-install --delete-original \
 
 %files
 %defattr(-,root,root,-)
+# %%license pulls the file out of the unpacked SOURCE tree, not the buildroot,
+# so LICENSE does not need an install rule in the .pro. It lands in
+# /usr/share/licenses/%{name}/ and it is what Chum looks for.
+%license LICENSE
 %{_bindir}/%{name}
 %{_datadir}/%{name}
 %{_datadir}/applications/%{name}.desktop

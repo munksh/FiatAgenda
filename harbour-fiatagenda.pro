@@ -52,6 +52,7 @@ DISTFILES += \
 # Not deployed -- kept in the repo so the icon and the design rig can be
 # regenerated. tools/make_icon.py rewrites icons/ and the SVG source.
 OTHER_FILES += \
+    LICENSE \
     tools/make_icon.py \
     tools/fiat-agenda-icon.svg \
     tools/fiat-agenda-preview.html
