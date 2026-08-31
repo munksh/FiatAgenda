@@ -70,7 +70,7 @@ Page {
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatAgendaTheme.secondaryText
-                text: qsTr("Most task apps want to know the project, the tag and the priority before they will let you write anything down. Fiat Agenda asks for the words. A date is optional, a time is optional, and no date at all is a proper answer rather than an unfinished one. Today and Upcoming are not lists you file things into — they are what the dates already say.")
+                text: qsTr("Most task apps want to know the project, the tag and the priority before they will let you write anything down. fiat agenda asks for the words. A date is optional, a time is optional, and no date at all is a proper answer rather than an unfinished one. Today and Upcoming are not lists you file things into — they are what the dates already say.")
             }
 
             Label {
@@ -179,7 +179,7 @@ Page {
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatAgendaTheme.secondaryText
-                text: qsTr("Fiat Agenda asks for one permission: your calendar. It is used only when you turn a task's own calendar switch on, and then only to write that one task's event into your default calendar, and to remove it again when the task changes or goes. A reminder rides on that event, which is why reminders still arrive when the app is closed. A task with the switch off never touches the calendar at all.")
+                text: qsTr("fiat agenda asks for one permission: your calendar. It is used only when you turn a task's own calendar switch on, and then only to write that one task's event into your default calendar, and to remove it again when the task changes or goes. A reminder rides on that event, which is why reminders still arrive when the app is closed. A task with the switch off never touches the calendar at all.")
             }
 
             Label {
