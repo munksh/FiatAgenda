@@ -104,7 +104,7 @@ QtObject {
     // Fiat Agenda's accent: plum. It marks what is selected, what recurs and
     // what is interactive -- never a verdict. The verdicts are green, amber
     // and red below, and plum cannot be mistaken for any of them.
-    readonly property color accent: ambient ? Theme.highlightColor : "#6E4A63"
+    readonly property color accent: ambient ? Theme.highlightColor : "#B04642"
 
     // ---- the shared paper ----
     readonly property color backgroundHigh: "#F2EFE8"
@@ -220,4 +220,9 @@ QtObject {
         try { p.highlightDimmerColor = ambient ? Theme.highlightDimmerColor : backgroundLow } catch (e) { }
         try { p.overlayBackgroundColor = ambient ? Theme.overlayBackgroundColor : backgroundHigh } catch (e) { }
     }
+    // Cover layout
+    readonly property real coverWordmarkTop: Theme.paddingLarge
+    readonly property real coverSideMargin: Theme.paddingLarge
+    readonly property real coverFigureFraction: 0.28
+    readonly property real coverFigureSize: Theme.fontSizeHuge
 }

@@ -1,14 +1,3 @@
-/*
- * The cover: how many things want you today, and which one is first.
- *
- * No cover actions. Adding a task needs the keyboard and completing one from
- * the cover would mean guessing which task was meant -- and a wrong guess on
- * a cover is a task quietly gone. The cover reports; the app acts.
- *
- * The figure is serif for the same reason the wordmark is: a grotesque
- * numeral under a serif wordmark reads as two unrelated typefaces.
- */
-
 import QtQuick 2.0
 import Sailfish.Silica 1.0
 import ".."
@@ -23,8 +12,8 @@ CoverBackground {
 
     Component.onCompleted: refresh()
 
-    // The cover only matters while the app is not in front, so that is when
-    // it is worth keeping fresh. A pair of COUNTs once a minute is nothing.
+    // Only worth keeping fresh while the app is not in front. A pair of
+    // COUNTs once a minute is nothing.
     Timer {
         interval: 60000
         repeat: true
@@ -46,17 +35,24 @@ CoverBackground {
         }
     }
 
-    // Centred, not left-aligned. A cover is a tile seen at a glance from
-    // arm's length, not a page you read. Each label carries
-    // horizontalAlignment as well as the Column's centring, because centring
-    // a Label's BOX is not the same as centring the TEXT inside it, and the
-    // difference shows the moment a task title wraps to two lines.
+    Label {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: FiatAgendaTheme.coverWordmarkTop
+        text: "fiat agenda"
+        color: FiatAgendaTheme.secondaryText
+        font.pixelSize: Theme.fontSizeTiny
+        font.family: FiatAgendaTheme.serif
+        font.italic: true
+    }
+
     Column {
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: Theme.paddingMedium
-        anchors.rightMargin: Theme.paddingMedium
-        anchors.verticalCenter: parent.verticalCenter
+        anchors.top: parent.top
+        anchors.leftMargin: FiatAgendaTheme.coverSideMargin
+        anchors.rightMargin: FiatAgendaTheme.coverSideMargin
+        anchors.topMargin: cover.height * FiatAgendaTheme.coverFigureFraction
         spacing: Theme.paddingSmall
 
         Label {
@@ -66,7 +62,7 @@ CoverBackground {
             color: cover.info.overdue > 0 ? FiatAgendaTheme.overdue
                  : cover.info.today > 0   ? FiatAgendaTheme.accent
                                           : FiatAgendaTheme.markIdle
-            font.pixelSize: Theme.fontSizeHuge
+            font.pixelSize: FiatAgendaTheme.coverFigureSize
             font.family: FiatAgendaTheme.serif
         }
 
@@ -89,28 +85,13 @@ CoverBackground {
         Label {
             width: parent.width
             visible: cover.info.next !== ""
-            text: cover.info.next
             horizontalAlignment: Text.AlignHCenter
+            text: cover.info.next
             color: FiatAgendaTheme.primaryText
             font.pixelSize: Theme.fontSizeExtraSmall
             wrapMode: Text.Wrap
             maximumLineCount: 2
             elide: Text.ElideRight
         }
-    }
-
-    // The wordmark sits at the FOOT of the cover, not above the figure. On a
-    // page the wordmark is the first thing and the app's own corner; on a
-    // cover it is the signature, and a signature goes at the bottom. The
-    // number is what the cover is for.
-    Label {
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: Theme.paddingLarge
-        text: "fiat agenda"
-        color: FiatAgendaTheme.secondaryText
-        font.pixelSize: Theme.fontSizeTiny
-        font.family: FiatAgendaTheme.serif
-        font.italic: true
     }
 }
