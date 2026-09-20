@@ -6,10 +6,9 @@ import "../Storage.js" as Storage
 
 // What has been finished, newest first.
 //
-// This is not a history and not an archive -- there is no soft delete behind
-// it and nothing here is kept for the record. It exists for the two minutes
-// after you tick the wrong thing, and so that clearing out the week is one
-// gesture rather than thirty.
+// Not an archive. Nothing here is kept for the record -- it exists for the two
+// minutes after ticking the wrong thing, and so that clearing out the week is
+// one gesture rather than thirty.
 //
 // A recurring task never appears here: completing one moves it to its next
 // occurrence instead of closing it.
@@ -27,20 +26,15 @@ Page {
 
     Component.onCompleted: paint()
 
-    // Silica's own chrome -- the virtual keyboard, the menus, field labels and
-    // underlines -- uses the palette it inherited when the page was BUILT.
-    // Setting it on the ApplicationWindow alone is not enough: a page pushed
-    // AFTER the switch was thrown carries the old one, which is why the main
-    // page came out right and this one did not.
-    //
-    // So every page paints itself, on creation and on every later switch.
+    // A page inherits the palette it was built with, so a page pushed after
+    // the switch was thrown keeps the old one until the app restarts. Every
+    // page paints itself.
     function paint() { FiatAgendaTheme.applyPalette(page) }
 
     Connections {
         target: FiatAgendaTheme
         onAmbientChanged: page.paint()
     }
-
 
     FiatBackground { }
 
@@ -119,6 +113,9 @@ Page {
                 border.color: FiatAgendaTheme.accent
             }
 
+            // reload() clears the model and refills it, and the delegates
+            // outlive their rows by a beat. Without the guards every row warns
+            // "Unable to assign [undefined] to QString" on each reload.
             Column {
                 anchors.left: mark.right
                 anchors.leftMargin: Theme.paddingMedium
@@ -129,14 +126,14 @@ Page {
 
                 Label {
                     width: parent.width
-                    text: model.title
+                    text: model.title === undefined ? "" : model.title
                     color: FiatAgendaTheme.secondaryText
                     font.pixelSize: Theme.fontSizeMedium
                     truncationMode: TruncationMode.Fade
                 }
                 Label {
-                    visible: model.listName !== ""
-                    text: model.listName
+                    visible: model.listName !== undefined && model.listName !== ""
+                    text: model.listName === undefined ? "" : model.listName
                     color: FiatAgendaTheme.secondaryText
                     font.pixelSize: Theme.fontSizeExtraSmall
                 }

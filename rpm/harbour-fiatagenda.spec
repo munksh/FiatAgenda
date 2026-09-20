@@ -1,6 +1,6 @@
 Name:       harbour-fiatagenda
 Summary:    A fast, minimal task list
-Version:    1.0.0
+Version:    1.1
 Release:    1
 License:    MIT
 URL:        https://github.com/munksh/FiatAgenda
@@ -12,20 +12,19 @@ BuildRequires:  pkgconfig(Qt5Qml)
 BuildRequires:  pkgconfig(Qt5Quick)
 BuildRequires:  desktop-file-utils
 
-# Note: QtQuick.LocalStorage and Nemo.Configuration both ship with the OS.
-# Do NOT add Requires: lines for them -- nemo-qml-plugin-configuration does
-# not exist as a package and the install will fail with "Paketet hittades ej".
+# QtQuick.LocalStorage and Nemo.Configuration both ship with the OS. Do NOT
+# add Requires: lines for them -- nemo-qml-plugin-configuration does not exist
+# as a package and the install fails with "Paketet hittades ej".
 #
 # Do NOT use %%qtc_qmake5 / %%qtc_make / %%qmake5_install here. Those macros
-# are Qt Creator's own and are not defined in this build target; an undefined
+# are Qt Creator's own and are undefined in this build target; an undefined
 # macro passes through literally and the build dies with "fg: no job control"
 # -- or worse, the install section runs and installs nothing, and the app
 # starts with no QML to load.
 #
-# And note the doubled percent signs above. rpm expands macros INSIDE COMMENTS
-# too. A bare %%install written in prose here expands to the real thing, which
-# carries %%debug_package with it -- so the debuginfo subpackage gets declared
-# from the comment, and then again from the actual section further down:
+# Note the doubled percent signs above. rpm expands macros INSIDE COMMENTS,
+# so a bare %%install written in prose expands to the real thing, carries
+# %%debug_package with it, and the debuginfo subpackage gets declared twice:
 #     error: line NN: %%package debuginfo: package NAME-debuginfo already exists
 # Every percent sign in a comment in this file is doubled on purpose.
 
@@ -115,7 +114,7 @@ Links:
 
 %build
 # APP_VERSION is passed through to the .pro, which turns it into a -D for the
-# compiler, which hands it to QML as the `appVersion` context property. The
+# compiler, which hands it to QML as the appVersion context property. The
 # about page therefore shows the version this package was BUILT with, and
 # Version: above stays the only place the number is written.
 %qmake5 APP_VERSION=%{version}
@@ -130,10 +129,11 @@ desktop-file-install --delete-original \
 
 %files
 %defattr(-,root,root,-)
-# %%license pulls the file out of the unpacked SOURCE tree, not the buildroot,
-# so LICENSE does not need an install rule in the .pro. It lands in
-# /usr/share/licenses/%{name}/ and it is what Chum looks for.
-%license LICENSE
+# The LICENSE is installed by the .pro and listed here by its buildroot path.
+# A bare %%license LICENSE does not work under sfdk: rpm runs that step from
+# the shadow build directory, which has no LICENSE in it, and the build fails
+# on a file that is present in the source tree all along.
+%license %{_datadir}/licenses/%{name}/LICENSE
 %{_bindir}/%{name}
 %{_datadir}/%{name}
 %{_datadir}/applications/%{name}.desktop

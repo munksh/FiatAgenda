@@ -3,22 +3,6 @@ import Sailfish.Silica 1.0
 import ".."
 import "../components"
 
-// Who made this, what it does with your data, and where it came from.
-//
-// Same four questions in the same order as Fiat Mos, and nothing else. No
-// changelog -- that belongs in the store listing and the repository, where it
-// can be corrected. No donation button. Two links.
-//
-// The lead is three examples rather than a summary. "A task list where the
-// date is optional" is accurate and says nothing; milk, the dentist and the
-// plants say the same thing and can be pictured. They are also chosen to be
-// the three shapes a task can have here: no date, a deadline, a repeat.
-//
-// The privacy paragraph is the only place in the app that makes a claim about
-// itself, and it is written flat on purpose. It also says the OPPOSITE of the
-// same paragraph in Fiat Mos -- there nothing is ever deleted, here delete
-// means delete. Both are true, and each app should say which one it is.
-
 Page {
     id: page
 
@@ -34,8 +18,6 @@ Page {
         onAmbientChanged: page.paint()
     }
 
-    // Fiat colours paint their own paper. Under an ambience there is no
-    // background at all -- the wallpaper is the background.
     FiatBackground { }
 
     SilicaFlickable {
@@ -110,51 +92,50 @@ Page {
                 text: qsTr("<b>agenda</b> — Latin, <i>the things that must be done</i>. Not a list and not a plan: a plural, from <i>agere</i>, to do. English borrowed it and made it singular, which is a shame. Every entry here is one of the things.")
             }
 
-            // -- The motto -------------------------------------------------
-            //
-            // Age quod agis is a real proverb and it shares a root with the
-            // app's own name -- agere gives both agenda and agis. That is
-            // stated up under "the name", where it is an etymology. Down here
-            // the line is left to stand on its own; a motto that explains
-            // itself is not a motto.
+            Item { width: 1; height: Theme.paddingLarge }
+
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: Theme.itemSizeSmall
+                height: 1
+                color: FiatAgendaTheme.innerBorder
+            }
+
+            Item { width: 1; height: Theme.paddingMedium }
+
+            Column {
+                x: Theme.horizontalPageMargin
+                width: content.width - Theme.horizontalPageMargin * 2
+                spacing: Theme.paddingSmall
+
+                Label {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.family: FiatAgendaTheme.serif
+                    font.italic: true
+                    color: FiatAgendaTheme.primaryText
+                    text: "Age quod agis"
+                }
+
+                Label {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: Theme.fontSizeExtraSmall
+                    color: FiatAgendaTheme.secondaryText
+                    text: qsTr("Do the thing you are doing.")
+                }
+            }
 
             Item { width: 1; height: Theme.paddingMedium }
 
             Rectangle {
-                x: Theme.horizontalPageMargin
-                width: content.width - Theme.horizontalPageMargin * 2
-                height: mottoColumn.height + Theme.paddingLarge * 2
-                radius: FiatAgendaTheme.cardRadius
-                color: FiatAgendaTheme.card
-                border.color: FiatAgendaTheme.cardBorder
-                border.width: FiatAgendaTheme.cardBorderWidth
-
-                Column {
-                    id: mottoColumn
-                    anchors.centerIn: parent
-                    width: parent.width - Theme.paddingLarge * 2
-                    spacing: Theme.paddingSmall
-
-                    Label {
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        horizontalAlignment: Text.AlignHCenter
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.family: FiatAgendaTheme.serif
-                        font.italic: true
-                        color: FiatAgendaTheme.primaryText
-                        text: "Age quod agis"
-                    }
-
-                    Label {
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        horizontalAlignment: Text.AlignHCenter
-                        font.pixelSize: Theme.fontSizeExtraSmall
-                        color: FiatAgendaTheme.secondaryText
-                        text: qsTr("Do the thing you are doing.")
-                    }
-                }
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: Theme.itemSizeSmall
+                height: 1
+                color: FiatAgendaTheme.innerBorder
             }
 
             // -- Privacy ---------------------------------------------------
@@ -272,9 +253,6 @@ Page {
             }
 
             // -- The family ---------------------------------------------------
-            //
-            // Every name translates itself, and the translation explains the
-            // app. That is worth more than a tagline.
 
             SectionLabel {
                 x: Theme.horizontalPageMargin
@@ -283,32 +261,68 @@ Page {
 
             Repeater {
                 model: [
-                    { name: "fiat lux", what: qsTr("let there be light — a light meter for film") },
-                    { name: "fiat vox", what: qsTr("let there be voice — a chromatic tuner") },
-                    { name: "fiat cor", what: qsTr("let there be heart — a metronome, after the first one anybody owns") },
-                    { name: "fiat mos", what: qsTr("let there be habit — a habit tracker where every habit is its own size") },
-                    { name: "fiat margo", what: qsTr("let there be a margin — a picture given room before it becomes an ambience") },
-                    { name: "fiat agenda", what: qsTr("let there be things to be done — this one") }
+                    { name: "fiat agenda", what: qsTr("let there be doing — this one"), icon: "images/family/harbour-fiatagenda.png", url: "" },
+                    { name: "fiat margo", what: qsTr("let there be edge — keeps edges"), icon: "images/family/harbour-fiatmargo.png", url: "https://openrepos.net/content/munkstolen/fiat-margo-keeps-edges" },
+                    { name: "fiat glossa", what: qsTr("let there be tongue — a translator"), icon: "images/family/harbour-fiatglossa.png", url: "https://openrepos.net/content/munkstolen/fiat-glossa-a-deepl-translator" },
+                    { name: "fiat vox", what: qsTr("let there be voice — a chromatic tuner"), icon: "images/family/harbour-fiatvox.png", url: "https://openrepos.net/content/munkstolen/fiat-vox-chromatic-tuner" },
+                    { name: "fiat pons", what: qsTr("let there be bridge — a native Qobuz client"), icon: "images/family/harbour-fiatpons.png", url: "https://openrepos.net/content/munkstolen/fiat-pons-native-qobuz-client" },
+                    { name: "fiat lux", what: qsTr("let there be light — a light meter for film - Coming soon"), icon: "images/family/harbour-fiatlux.png", url: "" },
+                    { name: "fiat cor", what: qsTr("let there be heart — a metronome"), icon: "images/family/harbour-fiatcor.png", url: "https://openrepos.net/content/munkstolen/fiat-cor-a-metronome" },
+                    { name: "fiat passus", what: qsTr("let there be step — a step counter - Coming soon"), icon: "images/family/harbour-fiatpassus.png", url: "" },
+                    { name: "fiat mos", what: qsTr("let there be habit — a habit tracker"), icon: "images/family/harbour-fiatmos.png", url: "https://openrepos.net/content/munkstolen/fiat-mos-habit-tracker" }
                 ]
 
-                Column {
+                delegate: BackgroundItem {
+                    id: familyRow
                     x: Theme.horizontalPageMargin
                     width: content.width - Theme.horizontalPageMargin * 2
+                    height: familyText.height
+                    enabled: modelData.url !== ""
+                    highlightedColor: FiatAgendaTheme.highlightWash
+                    onClicked: Qt.openUrlExternally(modelData.url)
 
-                    Label {
-                        width: parent.width
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.family: FiatAgendaTheme.serif
-                        color: FiatAgendaTheme.primaryText
-                        text: modelData.name
+                    // A cap, not a measurement of familyText: sizing the icon
+                    // from the text's height while the text's width comes
+                    // from the icon's width would make each depend on the
+                    // other, and QML gives no guarantee a loop like that
+                    // settles. Every "what" line here is one short sentence,
+                    // so in practice this cap and the real name+what height
+                    // match; if one ever wraps past it the icon just stops
+                    // growing with it instead of the layout misbehaving.
+                    readonly property real iconSlot: Theme.itemSizeSmall
+
+                    Image {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.min(familyText.height, familyRow.iconSlot)
+                        height: width
+                        source: Qt.resolvedUrl(modelData.icon)
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        opacity: modelData.url !== "" ? 1.0 : 0.55
                     }
 
-                    Label {
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        font.pixelSize: Theme.fontSizeExtraSmall
-                        color: FiatAgendaTheme.secondaryText
-                        text: modelData.what
+                    Column {
+                        id: familyText
+                        anchors.left: parent.left
+                        anchors.leftMargin: familyRow.iconSlot + Theme.paddingMedium
+                        anchors.right: parent.right
+
+                        Label {
+                            width: parent.width
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.family: FiatAgendaTheme.serif
+                            color: modelData.url !== "" ? FiatAgendaTheme.accent : FiatAgendaTheme.primaryText
+                            text: modelData.name
+                        }
+
+                        Label {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: Theme.fontSizeExtraSmall
+                            color: FiatAgendaTheme.secondaryText
+                            text: modelData.what
+                        }
                     }
                 }
             }
@@ -344,10 +358,6 @@ Page {
             }
 
             // -- Colophon --------------------------------------------------
-            //
-            // A printer's mark at the end of a book: a short rule, the mark,
-            // the wordmark. Nothing here is tappable -- the links are up under
-            // "made by". This is the signature, not a button.
 
             Item { width: 1; height: Theme.itemSizeExtraSmall }
 

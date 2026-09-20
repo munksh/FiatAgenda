@@ -5,20 +5,8 @@ import "../components"
 import "../Storage.js" as Storage
 import "../Dates.js" as Dates
 
-// The main page: one list, one row of pills, one field.
-//
-// The views are computed from dates, never curated:
-//   Today     everything dated on or before today. Overdue tasks belong to
-//             today -- giving them their own screen only means two lists to
-//             look at before breakfast.
-//   Upcoming  everything after today, nearest first.
-//   Anytime   no date at all, in the order you dragged them. "No date" is a
-//             normal state, not an unfinished one, so it gets a real home.
-//   Lists     one named list, likewise in manual order.
-//
-// Capture inherits the meaning of the view you are standing in: type in Today
-// and the task is due today, type in a list and it joins that list. The
-// placeholder says so out loud, so it reads as a rule rather than magic.
+// The main page:
+
 
 Page {
     id: page
@@ -49,18 +37,11 @@ Page {
         reload()
     }
 
-    // Coming back from a task page, the completed page, anywhere.
     onStatusChanged: if (status === PageStatus.Active) reload()
 
     Component.onCompleted: paint()
 
-    // Silica's own chrome -- the virtual keyboard, the menus, field labels and
-    // underlines -- uses the palette it inherited when the page was BUILT.
-    // Setting it on the ApplicationWindow alone is not enough: a page pushed
-    // AFTER the switch was thrown carries the old one, which is why the main
-    // page came out right and this one did not.
-    //
-    // So every page paints itself, on creation and on every later switch.
+
     function paint() { FiatAgendaTheme.applyPalette(page) }
 
     Connections {
@@ -71,15 +52,11 @@ Page {
 
     ListModel { id: taskModel }
 
-    // The calendar bridge belongs to the ApplicationWindow so it outlives any
-    // page -- see the note there.
     function calendarBridge() {
         if (FiatAgendaTheme.appWindow === null) return null
         return FiatAgendaTheme.appWindow.calendarBridge()
     }
 
-    // Fiat colours paint their own paper. Under an ambience there is no
-    // background at all -- the wallpaper is the background.
     FiatBackground { }
 
     SilicaListView {
@@ -90,15 +67,14 @@ Page {
         model: taskModel
         clip: true
 
-        // No backgroundColor here: it paints the whole panel and dims the
-        // entire screen behind the menu. Colour the items instead -- they read
-        // Theme.* directly and will otherwise stay ambience-coloured under
-        // Fiat colours no matter what the palette says.
         PullDownMenu {
             highlightColor: FiatAgendaTheme.accent
-
             MenuItem {
-                // Named for where you are going, not where you are.
+                text: qsTr("About")
+                color: FiatAgendaTheme.primaryText
+                onClicked: pageStack.animatorPush(Qt.resolvedUrl("AboutPage.qml"))
+            }
+            MenuItem {
                 text: FiatAgendaTheme.ambient ? qsTr("fiat colours") : qsTr("Follow ambience")
                 color: FiatAgendaTheme.primaryText
                 onClicked: FiatAgendaTheme.setAmbient(!FiatAgendaTheme.ambient)
@@ -107,11 +83,6 @@ Page {
                 text: qsTr("Completed")
                 color: FiatAgendaTheme.primaryText
                 onClicked: pageStack.animatorPush(Qt.resolvedUrl("CompletedPage.qml"))
-            }
-            MenuItem {
-                text: qsTr("About")
-                color: FiatAgendaTheme.primaryText
-                onClicked: pageStack.animatorPush(Qt.resolvedUrl("AboutPage.qml"))
             }
         }
 
@@ -144,9 +115,6 @@ Page {
                     }
                 }
 
-                // Lists sit on their own line so they read as a different kind
-                // of thing from the three computed views. There is no tag
-                // taxonomy on top of this and there is not going to be.
                 Flow {
                     x: Theme.horizontalPageMargin
                     width: page.width - Theme.horizontalPageMargin * 2
@@ -163,17 +131,11 @@ Page {
                     }
                 }
 
-                // Positioners have no padding on this Qt, and the first row
-                // must not sit flush against the pills.
+
                 Item { width: 1; height: Theme.paddingMedium }
             }
         }
 
-        // model.<role> goes undefined for a beat when the model is cleared
-        // while its delegates are still alive -- which is every reload. The
-        // string properties then warn "Unable to assign [undefined] to
-        // QString" once per row, per reload. Harmless, but it buries the
-        // warnings that are not.
         delegate: TaskRow {
             width: taskList.width
             taskId: model.taskId === undefined ? -1 : model.taskId
@@ -230,9 +192,7 @@ Page {
         VerticalScrollDecorator { }
     }
 
-    // Outside the list view on purpose: a plain child of a ListView is
-    // parented to its contentItem, which has no height when the model is
-    // empty -- exactly when this needs to be visible.
+
     EmptyNote {
         enabled: taskModel.count === 0
         text: page.view === "today"    ? qsTr("Nothing due today")
@@ -242,12 +202,6 @@ Page {
         hintText: qsTr("Type below to add one")
     }
 
-    // Fast capture, in the thumb zone.
-    //
-    // This is the one piece of permanent chrome on the main page, and it earns
-    // the place: capture is the primary action, not a secondary one, and a
-    // task manager you have to open a dialog to add to is a task manager you
-    // stop adding to. Open, type, enter -- under two seconds, no forced fields.
     Item {
         id: capture
 
@@ -258,8 +212,6 @@ Page {
 
         Rectangle {
             anchors.fill: parent
-            // Under Fiat colours this is the bottom of the gradient, so the
-            // bar disappears into the paper and only the hairline shows.
             color: FiatAgendaTheme.ambient ? FiatAgendaTheme.card
                                            : FiatAgendaTheme.backgroundLow
         }
@@ -282,19 +234,14 @@ Page {
                            : page.view === "upcoming" ? qsTr("Add for tomorrow")
                            : page.view === "anytime"  ? qsTr("Add a task")
                                                       : qsTr("Add to %1").arg(page.listName)
-            // Every field in the app names its own colour. The palette gets
-            // the underline and the label; the text itself does not always
-            // follow, and white text on cream paper is invisible.
+
             color: FiatAgendaTheme.primaryText
             inputMethodHints: Qt.ImhNoPredictiveText
             EnterKey.iconSource: "image://theme/icon-m-enter-accept"
             EnterKey.onClicked: page.commitCapture()
         }
 
-        // A BackgroundItem with a drawn label rather than an IconButton --
-        // same reason Fiat Mos's "+ Add set" is one. It is the idiom the
-        // family already uses, and it needs nothing from Silica beyond what
-        // is proven on this device.
+
         BackgroundItem {
             id: addButton
             anchors.right: parent.right

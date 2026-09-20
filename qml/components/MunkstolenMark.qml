@@ -2,65 +2,51 @@ import QtQuick 2.0
 import Sailfish.Silica 1.0
 import ".."
 
-// The Munkstolen mark: a choir stall, seen from the front.
+// The Munkstolen mark: a choir stall seen from the front.
 //
-// A munkstol is a misericord -- the small ledge under a hinged choir seat that
-// lets a monk rest while appearing to stand through a long office. A good name
-// for a maker's mark, and a good thing to have drawn rather than shipped.
+// Drawn rather than shipped as an image. It is one colour, so it takes the
+// theme colour and is correct in Fiat colours and in every ambience without a
+// second asset, and it stays sharp at any size.
 //
-// DRAWN, NOT SHIPPED. The mark is one colour, so it is a path and not an
-// image. That means it takes the theme colour and is therefore correct in Fiat
-// colours and in every ambience, light or dark, without a second asset and
-// without anyone deciding what a dark mark does on dark paper. It is also
-// sharp at any size, which a PNG is not.
+// Canvas rather than QtQuick.Shapes: Shapes needs Qt 5.10, which Sailfish
+// cannot be relied on to have. Canvas is in every Qt 5.
 //
-// Canvas rather than QtQuick.Shapes: Shapes needs Qt 5.10 and Sailfish cannot
-// be relied on to have it. Canvas is in every Qt 5.
-//
-// The path below was converted from the original SVG mechanically and checked
-// by rebuilding an SVG from these very calls and comparing the two renderings
-// pixel for pixel -- ten pixels differed, all of them antialiasing. Do not
-// hand-edit it. Re-run tools/convert_mark.py if the logo ever changes.
-//
-// Coordinates are in the original 51.02 viewBox and scaled by k, so the whole
-// thing follows `width`.
+// The path was converted from the original SVG mechanically. Do not hand-edit
+// it -- re-run tools/convert_mark.py if the logo changes. Coordinates are in
+// the original 51.02 viewBox and scaled by k, so the mark follows `width`.
 
 Canvas {
     id: root
 
-    // The mark itself. Defaults to the app's primary text colour, which is what
-    // makes it right in every mode without being told.
-    property color color: FiatMosTheme.primaryText
+    property color color: FiatAgendaTheme.primaryText
 
-    // The roundel around it:
+    // The roundel around the mark:
     //
     //   "none"  the mark alone, filling the item
-    //   "ring"  the roundel drawn as an outline in the mark's own colour, so
-    //           it belongs to the page rather than sitting on top of it
-    //   "disc"  the roundel filled, for an unknown background
+    //   "ring"  an outline in the mark's own colour, so it belongs to the page
+    //   "disc"  filled, for an unknown background
     //
-    // "ring" is what the About page uses. The filled disc is a white plate,
-    // and a white plate on cream paper reads as a shape rather than a mark.
+    // The About page uses "ring". A filled disc reads as a white plate on
+    // cream paper rather than as a mark.
     property string frame: "none"
 
-    property color discColor: FiatMosTheme.card
+    property color discColor: FiatAgendaTheme.card
 
-    // How much of the ring's diameter the mark itself takes. The original
-    // artwork leaves a lot of air; at 80 px that air is what makes the chair
-    // small, so the mark is scaled up inside the ring rather than kept at its
-    // drawn proportion.
+    // How much of the ring's diameter the mark takes. The original artwork
+    // leaves a lot of air around it, which at small sizes reads as a chair
+    // drawn too small, so the mark is scaled up inside the ring.
     property real markScale: 0.62
 
-    // Fill the item with the MARK's own bounding box rather than the original
-    // square, which is mostly empty around it. Only when there is no roundel.
+    // Fill the item with the mark's own bounding box rather than the original
+    // square, which is mostly empty. Only when there is no roundel.
     property bool trim: frame === "none"
 
     width: Theme.itemSizeSmall
     height: width
     renderStrategy: Canvas.Immediate
 
-    // See ProgressRing: a Canvas loses its texture while the app is in the
-    // background and nothing repaints it on the way back.
+    // A Canvas loses its texture while the app is in the background and
+    // nothing repaints it on the way back.
     Connections {
         target: Qt.application
         onStateChanged: {
@@ -108,7 +94,6 @@ Canvas {
         if (root.trim) {
             k = Math.min(width / 17.68, height / 26.12)
         } else {
-            // Sized against the ring rather than against the original square.
             k = (side * root.markScale) / 26.12
         }
         dx = (width - 17.68 * k) / 2 - 16.68 * k
