@@ -99,11 +99,11 @@ Categories:
  - Office
 Custom:
   Repo: https://github.com/munksh/FiatAgenda
-PackageIcon: https://munkstolen.se/SFOS/fiat-agenda/harbour-fiatagenda.png
+PackageIcon: https://munkstolen.se/SFOS/harbour-fiatagenda.png
 Screenshots:
- - https://munkstolen.se/SFOS/fiat-agenda/fiat-agenda1.png
- - https://munkstolen.se/SFOS/fiat-agenda/fiat-agenda2.png
- - https://munkstolen.se/SFOS/fiat-agenda/fiat-agenda3.png
+ - https://munkstolen.se/SFOS/fiatagenda1.png
+ - https://munkstolen.se/SFOS/fiatagenda2.png
+ - https://munkstolen.se/SFOS/fiatagenda3.png
 Links:
   Homepage: https://github.com/munksh/FiatAgenda
   Bugtracker: https://github.com/munksh/FiatAgenda/issues
