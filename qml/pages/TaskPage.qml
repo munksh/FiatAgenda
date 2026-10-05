@@ -423,25 +423,19 @@ Page {
                 visible: page.task !== null && page.task.dueDate !== ""
             }
 
-            Flow {
-                x: Theme.horizontalPageMargin
-                width: parent.width - Theme.horizontalPageMargin * 2
-                spacing: Theme.paddingSmall
+            SwitchRow {
                 visible: page.task !== null && page.task.dueDate !== ""
-
-                Pill {
-                    text: qsTr("In calendar")
-                    selected: page.task !== null && page.task.exportToCalendar === 1
-                    onClicked: {
-                        if (page.task === null) return
-                        var on = page.task.exportToCalendar === 1
-                        var fields = { exportToCalendar: on ? 0 : 1 }
-                        // Turning the entry off takes the reminder with it --
-                        // there is nothing left to fire it.
-                        if (on) fields.remindMinutes = -1
-                        page.save(fields)
-                        page.syncCalendar()
-                    }
+                text: qsTr("In calendar")
+                checked: page.task !== null && page.task.exportToCalendar === 1
+                onClicked: {
+                    if (page.task === null) return
+                    var on = page.task.exportToCalendar === 1
+                    var fields = { exportToCalendar: on ? 0 : 1 }
+                    // Turning the entry off takes the reminder with it --
+                    // there is nothing left to fire it.
+                    if (on) fields.remindMinutes = -1
+                    page.save(fields)
+                    page.syncCalendar()
                 }
             }
 

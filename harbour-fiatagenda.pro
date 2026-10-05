@@ -17,6 +17,7 @@ DISTFILES += \
     qml/components/EmptyNote.qml \
     qml/components/DialogHead.qml \
     qml/components/Pill.qml \
+    qml/components/SwitchRow.qml \
     qml/components/TaskRow.qml \
     qml/components/CalendarBridge.qml \
     qml/components/MunkstolenMark.qml \
