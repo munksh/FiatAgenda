@@ -1,16 +1,19 @@
 /*
- * Fiat Agenda -- a fast, minimal task list.
+ * Fiat Agenda -- your tasks, and the household's lists.
  *
  * Part of the Munkstolen Fiat family. The Fiat colours standard lives in
- * FiatAgendaTheme; this file's one real job is to hand Silica's own chrome
- * the palette, once, at the top of the tree.
+ * FiatAgendaTheme. Besides handing Silica's chrome the palette, this file
+ * owns what must outlive any page: the calendar bridge, and the sync with
+ * Nextcloud Tasks.
  */
 
 import QtQuick 2.0
 import Sailfish.Silica 1.0
+import Nemo.Configuration 1.0
 import "."          // qmldir lives here: this is what resolves FiatAgendaTheme
 import "pages"
 import "Storage.js" as Storage
+import "Sync.js" as Sync
 
 ApplicationWindow {
     id: app
@@ -43,6 +46,10 @@ ApplicationWindow {
         // Once, here: palette is inherited, so every Silica control in every
         // page below picks it up.
         FiatAgendaTheme.applyPalette(app)
+        if (account.signedIn) {
+            account.checkPantry()
+            syncNow()
+        }
     }
 
     Connections {
@@ -82,5 +89,141 @@ ApplicationWindow {
             if (taskId > 0 && instanceId !== "")
                 Storage.updateTask(taskId, { calendarEventId: instanceId })
         }
+    }
+
+    // ---- Nextcloud ----
+    //
+    // Tasks sync with Nextcloud Tasks when it is switched on: at start, when
+    // the app comes back to the front, a few seconds after a change, and
+    // every five minutes while it is open. A run that failed is not retried
+    // for a minute, so a phone without a connection is not kept busy.
+
+    ConfigurationValue {
+        id: tasksSyncConfig
+        key: "/apps/harbour-fiatagenda/tasksSync"
+        defaultValue: false
+    }
+    ConfigurationValue {
+        id: lastSyncConfig
+        key: "/apps/harbour-fiatagenda/lastSync"
+        defaultValue: 0
+    }
+
+    readonly property bool tasksSync: account.signedIn
+                                      && (tasksSyncConfig.value === true || tasksSyncConfig.value === "true")
+    property bool syncing: false
+    property string syncError: ""
+    readonly property double lastSync: Number(lastSyncConfig.value) || 0
+    property double lastFailure: 0
+    property string nextcloudNotice: ""
+
+    // After a run that changed something here, so the pages read again.
+    signal synced()
+
+    function setTasksSync(on) {
+        tasksSyncConfig.value = on
+        if (on) syncNow()
+    }
+
+    function syncNow() {
+        if (!tasksSync || syncing) return
+        syncing = true
+        Sync.run(dav, function (ok, report) {
+            app.syncing = false
+            if (report.busy) return
+            if (ok) {
+                app.syncError = ""
+                lastSyncConfig.value = new Date().getTime()
+            } else {
+                app.syncError = report.errors.length > 0 ? report.errors[0] : ""
+                app.lastFailure = new Date().getTime()
+            }
+            app.followCalendar(report)
+            if (report.pulled > 0 || report.removed > 0) app.synced()
+        })
+    }
+
+    function syncSoon() {
+        if (!tasksSync || syncing) return
+        if (new Date().getTime() - lastFailure < 60000) return
+        if (Storage.pendingCount() > 0) soonTimer.restart()
+    }
+
+    Timer {
+        id: soonTimer
+        interval: 4000
+        onTriggered: app.syncNow()
+    }
+    Timer {
+        interval: 300000
+        repeat: true
+        running: app.tasksSync && Qt.application.state === Qt.ApplicationActive
+        onTriggered: app.syncNow()
+    }
+    Connections {
+        target: Qt.application
+        onStateChanged: {
+            if (!app.tasksSync) return
+            var now = new Date().getTime()
+            if (Qt.application.state === Qt.ApplicationActive) {
+                if (now - app.lastSync > 60000 && now - app.lastFailure > 60000) app.syncNow()
+            } else if (Storage.pendingCount() > 0) {
+                app.syncNow()
+            }
+        }
+    }
+
+    // A task the server changed keeps its calendar entry in step, the same
+    // way an edit on the task page does.
+    function followCalendar(report) {
+        var ids = report.changed || []
+        var gone = report.removedEvents || []
+        if (ids.length === 0 && gone.length === 0) return
+        var bridge = null
+        try {
+            for (var i = 0; i < ids.length; i++) {
+                var t = Storage.getTask(ids[i])
+                if (t === null || (t.exportToCalendar !== 1 && t.calendarEventId === "")) continue
+                if (bridge === null) bridge = calendarBridge()
+                if (bridge === null) return
+                if (t.exportToCalendar !== 1 || t.dueDate === "") {
+                    if (t.calendarEventId !== "") bridge.removeEvent(t.calendarEventId)
+                    Storage.updateTask(t.taskId, { calendarEventId: "" })
+                    continue
+                }
+                var id = bridge.saveEvent(t.taskId, t.calendarEventId, t.title, t.note, t.dueDate,
+                                          t.dueTime, t.remindMinutes, Storage.claimedCalendarIds())
+                if (id !== "") Storage.updateTask(t.taskId, { calendarEventId: id })
+            }
+            for (var j = 0; j < gone.length; j++) {
+                if (bridge === null) bridge = calendarBridge()
+                if (bridge !== null) bridge.removeEvent(gone[j])
+            }
+        } catch (e) {
+            console.log("harbour-fiatagenda: calendar unavailable -- " + e)
+        }
+    }
+
+    // Signing out lets go of the server; every task stays on the phone.
+    function signOut() {
+        Storage.forgetServer()
+        account.signOut()
+    }
+
+    // A revoked app password answers 401 to everything.
+    function lostSignIn() {
+        if (!account.signedIn) return
+        nextcloudNotice = qsTr("The server no longer accepts this phone's sign-in. Connect again to go on syncing.")
+        signOut()
+    }
+    Connections { target: api; onUnauthorized: app.lostSignIn() }
+    Connections { target: dav; onUnauthorized: app.lostSignIn() }
+    Connections {
+        target: account
+        onSignedInNow: {
+            app.nextcloudNotice = ""
+            account.checkPantry()
+        }
+        onPantryChanged: if (account.pantryState === "unauthorized") app.lostSignIn()
     }
 }

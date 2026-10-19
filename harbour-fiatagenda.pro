@@ -1,8 +1,22 @@
 TARGET = harbour-fiatagenda
 
 CONFIG += sailfishapp
+QT += network
 
-SOURCES += src/harbour-fiatagenda.cpp
+SOURCES += \
+    src/harbour-fiatagenda.cpp \
+    src/account.cpp \
+    src/api.cpp \
+    src/authnam.cpp \
+    src/credentials.cpp \
+    src/dav.cpp
+
+HEADERS += \
+    src/account.h \
+    src/api.h \
+    src/authnam.h \
+    src/credentials.h \
+    src/dav.h
 
 DISTFILES += \
     qml/harbour-fiatagenda.qml \
@@ -10,6 +24,9 @@ DISTFILES += \
     qml/qmldir \
     qml/Storage.js \
     qml/Dates.js \
+    qml/Sync.js \
+    qml/Pantry.js \
+    qml/Shelf.js \
     qml/components/FiatBackground.qml \
     qml/components/PageHead.qml \
     qml/components/Wordmark.qml \
@@ -21,6 +38,19 @@ DISTFILES += \
     qml/components/TaskRow.qml \
     qml/components/CalendarBridge.qml \
     qml/components/MunkstolenMark.qml \
+    qml/components/ModeHead.qml \
+    qml/components/HouseholdView.qml \
+    qml/components/Choice.qml \
+    qml/components/Mark.qml \
+    qml/components/ColourChoice.qml \
+    qml/components/ErrorLine.qml \
+    qml/components/ActivityLine.qml \
+    qml/components/LinkText.qml \
+    qml/components/FiatButton.qml \
+    qml/components/SyncSpinner.qml \
+    qml/components/Ring.qml \
+    qml/components/FaceCard.qml \
+    qml/components/RepeatMark.qml \
     qml/images/family/harbour-fiatagenda.png \
     qml/images/family/harbour-fiatmargo.png \
     qml/images/family/harbour-fiatglossa.png \
@@ -36,6 +66,15 @@ DISTFILES += \
     qml/pages/TimeDialog.qml \
     qml/pages/CompletedPage.qml \
     qml/pages/AboutPage.qml \
+    qml/pages/NextcloudPage.qml \
+    qml/pages/AppPasswordDialog.qml \
+    qml/pages/PantryListPage.qml \
+    qml/pages/PantryItemDialog.qml \
+    qml/pages/PantryListDialog.qml \
+    qml/pages/CategoryPickerPage.qml \
+    qml/pages/CategoryDialog.qml \
+    qml/pages/HouseholdsPage.qml \
+    qml/pages/HouseholdDialog.qml \
     qml/cover/CoverPage.qml \
     rpm/harbour-fiatagenda.spec \
     harbour-fiatagenda.desktop
@@ -60,6 +99,9 @@ REQUIRED_FILES = \
     qml/qmldir \
     qml/Storage.js \
     qml/Dates.js \
+    qml/Sync.js \
+    qml/Pantry.js \
+    qml/Shelf.js \
     LICENSE
 
 for(f, REQUIRED_FILES) {

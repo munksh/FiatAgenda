@@ -28,6 +28,7 @@ MouseArea {
     property string text: ""
     property bool selected: false
     property bool multi: false
+    property int pixelSize: Theme.fontSizeSmall
 
     // A long word -- a book title, a tag -- is shortened rather than allowed to
     // push the Flow wider than the page.
@@ -35,7 +36,7 @@ MouseArea {
         (parent ? parent.width : Theme.itemSizeHuge * 3) - Theme.paddingMedium * 2)
 
     implicitWidth: Math.min(sizer.implicitWidth, roomForText) + Theme.paddingMedium * 2
-    implicitHeight: Theme.itemSizeExtraSmall
+    implicitHeight: Math.max(Theme.itemSizeExtraSmall, sizer.implicitHeight + Theme.paddingMedium * 2)
     width: implicitWidth
     height: implicitHeight
 
@@ -43,7 +44,7 @@ MouseArea {
         id: sizer
         visible: false
         text: root.text
-        font.pixelSize: Theme.fontSizeSmall
+        font.pixelSize: root.pixelSize
         font.bold: true
     }
 
@@ -61,7 +62,7 @@ MouseArea {
         horizontalAlignment: Text.AlignHCenter
         truncationMode: TruncationMode.Fade
         text: root.text
-        font.pixelSize: Theme.fontSizeSmall
+        font.pixelSize: root.pixelSize
         font.bold: root.selected
         color: root.selected ? FiatAgendaTheme.accent : FiatAgendaTheme.secondaryText
     }

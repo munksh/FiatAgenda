@@ -38,6 +38,7 @@ ListItem {
 
     property bool showList: true          // false inside a list's own view
     property bool showHandle: false       // true only where order is manual
+    property bool rule: true              // the hairline under the row
     property int itemIndex: -1
     property var listView: null
 
@@ -51,6 +52,13 @@ ListItem {
 
     readonly property bool overdue: Dates.isOverdue(dueDate)
     readonly property bool dueToday: Dates.isToday(dueDate)
+
+    // On the right: how late, or when. A task due today says only its time,
+    // since the view already says today.
+    readonly property string whenText: dueDate === "" ? ""
+        : overdue ? Dates.formatSince(dueDate)
+        : dueToday ? dueTime
+        : Dates.formatDue(dueDate, dueTime)
 
     // How far in from the left counts as the mark rather than the title.
     // Derived from the mark's real size so the two can never drift apart.
@@ -167,8 +175,9 @@ ListItem {
             radius: width / 2
             color: "transparent"
             border.width: 2
-            border.color: row.overdue ? FiatAgendaTheme.overdue
-                        : row.dueToday ? FiatAgendaTheme.accent
+            // Late is said once, in words on the right; the mark stays the
+            // colour of today.
+            border.color: row.overdue || row.dueToday ? FiatAgendaTheme.accent
                         : FiatAgendaTheme.markIdle
         }
 
@@ -176,8 +185,8 @@ ListItem {
             id: texts
             anchors.left: mark.right
             anchors.leftMargin: Theme.paddingMedium
-            anchors.right: handle.visible ? handle.left : parent.right
-            anchors.rightMargin: handle.visible ? Theme.paddingMedium : Theme.horizontalPageMargin
+            anchors.right: when.visible ? when.left : (handle.visible ? handle.left : parent.right)
+            anchors.rightMargin: when.visible || handle.visible ? Theme.paddingMedium : Theme.horizontalPageMargin
             anchors.verticalCenter: parent.verticalCenter
             spacing: 2
 
@@ -189,43 +198,58 @@ ListItem {
                 truncationMode: TruncationMode.Fade
             }
 
-            // The meta line only exists when it has something to say. An
-            // invisible child does not collapse this Column -- the Column is
-            // inside an Item with its own height, not the other way round --
-            // but it does stop reserving a line, which is the point.
+            // Which list, and how far the subtasks have got. The line only
+            // exists when it has something to say.
             Row {
                 spacing: Theme.paddingSmall
-                visible: dueLabel.visible || listLabel.visible || repeatLabel.visible || subLabel.visible
+                visible: listLabel.visible || subLabel.visible
 
-                Label {
-                    id: dueLabel
-                    visible: row.dueDate !== ""
-                    text: Dates.formatDue(row.dueDate, row.dueTime)
-                    color: row.overdue ? FiatAgendaTheme.overdue
-                         : row.dueToday ? FiatAgendaTheme.accent
-                         : FiatAgendaTheme.secondaryText
-                    font.pixelSize: Theme.fontSizeExtraSmall
-                }
                 Label {
                     id: listLabel
                     visible: row.showList && row.listName !== ""
-                    text: (dueLabel.visible ? "· " : "") + row.listName
+                    text: row.listName
                     color: FiatAgendaTheme.secondaryText
-                    font.pixelSize: Theme.fontSizeExtraSmall
-                }
-                Label {
-                    id: repeatLabel
-                    visible: row.repeatEvery > 0
-                    text: "↻"
-                    color: FiatAgendaTheme.accent
                     font.pixelSize: Theme.fontSizeExtraSmall
                 }
                 Label {
                     id: subLabel
                     visible: row.subTotal > 0
-                    text: row.subDone + "/" + row.subTotal
+                    text: (listLabel.visible ? "· " : "") + row.subDone + "/" + row.subTotal
                     color: row.subTotal > 0 && row.subDone === row.subTotal
                            ? FiatAgendaTheme.accent : FiatAgendaTheme.secondaryText
+                    font.pixelSize: Theme.fontSizeExtraSmall
+                }
+            }
+        }
+
+        // When, and how often, on the right where the eye finishes the line.
+        Column {
+            id: when
+            visible: whenLabel.visible || repeatRow.visible
+            anchors.right: handle.visible ? handle.left : parent.right
+            anchors.rightMargin: handle.visible ? 0 : Theme.horizontalPageMargin
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 2
+
+            Label {
+                id: whenLabel
+                anchors.right: parent.right
+                visible: row.whenText !== ""
+                text: row.whenText
+                color: row.overdue ? FiatAgendaTheme.overdue : FiatAgendaTheme.primaryText
+                font.family: FiatAgendaTheme.serif
+                font.italic: row.overdue
+                font.pixelSize: Theme.fontSizeSmall
+            }
+            Row {
+                id: repeatRow
+                anchors.right: parent.right
+                visible: row.repeatEvery > 0
+                spacing: Theme.paddingSmall / 2
+                RepeatMark { anchors.verticalCenter: parent.verticalCenter }
+                Label {
+                    text: Dates.formatRepeat(row.repeatEvery, row.repeatUnit).toLowerCase()
+                    color: FiatAgendaTheme.secondaryText
                     font.pixelSize: Theme.fontSizeExtraSmall
                 }
             }
@@ -288,6 +312,16 @@ ListItem {
                 }
             }
         }
+    }
+
+    Rectangle {
+        visible: row.rule
+        // At the foot of the row, not of the item: an open menu makes the
+        // item taller, and the line belongs above the menu.
+        y: row.contentHeight - height
+        width: row.width
+        height: 1
+        color: FiatAgendaTheme.hairline
     }
 
     // The held row lifts off the paper rather than changing colour.

@@ -22,6 +22,9 @@ Item {
     // and a property of the same name in one expression, and the resolution
     // order between them is not something worth betting a header on.
     property Page owner: null
+    // A dialog with something required (a name, say) says so through
+    // canAccept; the word stays greyed until it is there.
+    readonly property bool canAccept: owner === null || owner.canAccept === undefined || owner.canAccept
 
     width: parent ? parent.width : 0
     height: titleText.y + titleText.height + Theme.paddingLarge
@@ -51,12 +54,14 @@ Item {
         anchors.verticalCenter: cancel.verticalCenter
         text: head.acceptText
         color: acceptArea.pressed ? FiatAgendaTheme.accent : FiatAgendaTheme.primaryText
+        opacity: head.canAccept ? 1.0 : 0.35
         font.pixelSize: Theme.fontSizeSmall
         MouseArea {
             id: acceptArea
             anchors.centerIn: parent
             width: parent.width + Theme.paddingLarge * 2
             height: Theme.itemSizeSmall
+            enabled: head.canAccept
             onClicked: if (head.owner !== null) head.owner.accept()
         }
     }

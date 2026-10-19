@@ -101,9 +101,9 @@ QtObject {
     readonly property color primaryText:   ambient ? Theme.primaryColor   : "#1A1A1A"
     readonly property color secondaryText: ambient ? Theme.secondaryColor : Qt.rgba(0.10, 0.10, 0.10, 0.55)
 
-    // Fiat Agenda's accent: plum. It marks what is selected, what recurs and
-    // what is interactive -- never a verdict. The verdicts are green, amber
-    // and red below, and plum cannot be mistaken for any of them.
+    // Fiat Agenda's accent: brick. It marks what is selected, what recurs and
+    // what is interactive -- never a verdict. It sits close to the one
+    // verdict below, overdue, so a late task also says so in words.
     readonly property color accent: ambient ? Theme.highlightColor : "#B04642"
 
     // ---- the shared paper ----
@@ -127,6 +127,9 @@ QtObject {
     readonly property color pillBorder:       Theme.rgba(primaryText, 0.55)
     readonly property color pillFillActive:   Theme.rgba(accent, 0.15)
     readonly property color pillBorderActive: Theme.rgba(accent, 0.45)
+    // Choices that move you around the front page: the two modes, the views,
+    // the lists and the households. Choices of a value stay at fontSizeSmall.
+    readonly property int navFontSize: Theme.fontSizeMedium
 
     // ---- meaning, never decoration ----
     //
@@ -142,7 +145,11 @@ QtObject {
     // So green went first and amber followed. What is left never follows the
     // ambience or the accent: an instrument that said different things in
     // different wallpapers would not be an instrument.
-    readonly property color overdue: dark ? "#A0403A" : "#8A2B25"
+    //
+    // The dark variant is lighter than the family's #A0403A on purpose: that
+    // one measures 2.7:1 on a dark ambience, which is unreadable for a short
+    // italic word. #F08A80 is 7.2:1 there; #8A2B25 is 7.5:1 on the paper.
+    readonly property color overdue: dark ? "#F08A80" : "#8A2B25"
     readonly property color wrong: overdue          // the name the family uses
 
     // The mark you tap to tick something off. Fiat Mos's habit indicator is
@@ -211,7 +218,7 @@ QtObject {
         try { p.highlightColor = accent } catch (e) { }
         try { p.secondaryHighlightColor = Theme.rgba(accent, 0.6) } catch (e) { }
         // NOT the accent. This role is what the virtual keyboard paints its
-        // keys with, and a 30% plum over light paper turned the whole keyboard
+        // keys with, and a 30% accent over light paper turned the whole keyboard
         // mauve. It is the same role that tints selected text, so it has to
         // stay quiet: a neutral wash serves both and shouts in neither.
         // (Fiat Mos paid for this one with a pale green keyboard.)

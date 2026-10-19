@@ -2,6 +2,6 @@
     <service name="tar_git">
     <param name="url">https://github.com/munksh/FiatAgenda.git</param>
     <param name="branch">main</param>
-    <param name="revision">1.2</param>
+    <param name="revision">2.0</param>
     </service>
 </services>

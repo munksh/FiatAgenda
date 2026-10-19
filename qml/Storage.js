@@ -16,7 +16,7 @@
 .import QtQuick.LocalStorage 2.0 as LS
 .import "Dates.js" as Dates
 
-var SCHEMA = "3"       // bump, add a step to migrate(), never edit an old step
+var SCHEMA = "5"       // bump, add a step to migrate(), never edit an old step
 
 var ready = false
 
@@ -82,6 +82,42 @@ function migrate(d) {
         d = open_()
     }
 
+    // v4: sync with a CalDAV server (Nextcloud Tasks).
+    //   remote*      where the task lives on the server, and the copy last
+    //                seen there -- kept whole, so properties other clients set
+    //                survive a write from here
+    //   dirty        changed here since it was last sent; 1 for every row
+    //                that exists today, so a list switched on later sends all
+    //   modifiedAt   when it changed here, for "the newest change wins"
+    //   tombstones   tasks deleted here that the server still has
+    //   remote_lists the server's task lists and which list here each one is
+    if (d.version === "3") {
+        d.changeVersion("3", "4", function (tx) {
+            tx.executeSql("ALTER TABLE tasks ADD COLUMN remoteUid TEXT DEFAULT ''")
+            tx.executeSql("ALTER TABLE tasks ADD COLUMN remoteHref TEXT DEFAULT ''")
+            tx.executeSql("ALTER TABLE tasks ADD COLUMN remoteEtag TEXT DEFAULT ''")
+            tx.executeSql("ALTER TABLE tasks ADD COLUMN remoteList TEXT DEFAULT ''")
+            tx.executeSql("ALTER TABLE tasks ADD COLUMN remoteIcs TEXT DEFAULT ''")
+            tx.executeSql("ALTER TABLE tasks ADD COLUMN dirty INTEGER DEFAULT 1")
+            tx.executeSql("ALTER TABLE tasks ADD COLUMN modifiedAt INTEGER DEFAULT 0")
+            tx.executeSql("CREATE TABLE IF NOT EXISTS tombstones (href TEXT PRIMARY KEY, etag TEXT DEFAULT '')")
+            tx.executeSql("CREATE TABLE IF NOT EXISTS remote_lists (href TEXT PRIMARY KEY, name TEXT DEFAULT '', color TEXT DEFAULT '', listName TEXT DEFAULT '', enabled INTEGER DEFAULT 0, isDefault INTEGER DEFAULT 0)")
+        })
+        d = open_()
+    }
+
+    // v5: the Lists side without a server. The phone's own household, kept in
+    // the same shape Pantry uses, so the same pages show it. Times are in
+    // seconds, as Pantry's are.
+    if (d.version === "4") {
+        d.changeVersion("4", "5", function (tx) {
+            tx.executeSql("CREATE TABLE IF NOT EXISTS shelf_lists (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT DEFAULT '', color TEXT DEFAULT '', sortOrder INTEGER DEFAULT 0, createdAt INTEGER DEFAULT 0, updatedAt INTEGER DEFAULT 0)")
+            tx.executeSql("CREATE TABLE IF NOT EXISTS shelf_items (id INTEGER PRIMARY KEY AUTOINCREMENT, listId INTEGER NOT NULL, name TEXT NOT NULL, description TEXT DEFAULT '', quantity TEXT DEFAULT '', categoryId INTEGER DEFAULT 0, done INTEGER DEFAULT 0, doneAt INTEGER DEFAULT 0, rrule TEXT DEFAULT '', repeatFromCompletion INTEGER DEFAULT 0, deleteOnDone INTEGER DEFAULT 0, nextDueAt INTEGER DEFAULT 0, sortOrder INTEGER DEFAULT 0, createdAt INTEGER DEFAULT 0, updatedAt INTEGER DEFAULT 0)")
+            tx.executeSql("CREATE TABLE IF NOT EXISTS shelf_categories (id INTEGER PRIMARY KEY AUTOINCREMENT, listId INTEGER DEFAULT 0, name TEXT NOT NULL, color TEXT DEFAULT '', icon TEXT DEFAULT '', sortOrder INTEGER DEFAULT 0, createdAt INTEGER DEFAULT 0)")
+        })
+        d = open_()
+    }
+
     return d
 }
 
@@ -96,12 +132,15 @@ var SELECT_ROW = "SELECT t.id, t.title, t.note, t.listName, t.parentId, t.done, 
 // The model role is taskId, not id: `id` is loaded language in a QML
 // delegate, and the one place a reader has to pause is the one place a bug
 // hides.
+// LocalStorage stores a bound "" as NULL, so text is read back through text().
+function text(v) { return (v === null || v === undefined) ? "" : v }
+
 function rowToObject(r) {
     return {
-        taskId: r.id, title: r.title, note: r.note, listName: r.listName,
+        taskId: r.id, title: text(r.title), note: text(r.note), listName: text(r.listName),
         parentId: r.parentId, done: r.done, doneAt: r.doneAt,
-        dueDate: r.dueDate, dueTime: r.dueTime,
-        repeatEvery: r.repeatEvery, repeatUnit: r.repeatUnit,
+        dueDate: text(r.dueDate), dueTime: text(r.dueTime),
+        repeatEvery: r.repeatEvery, repeatUnit: text(r.repeatUnit),
         sortIndex: r.sortIndex,
         exportToCalendar: (r.exportToCalendar === undefined ? 0 : r.exportToCalendar),
         calendarEventId: (r.calendarEventId === undefined ? "" : r.calendarEventId),
@@ -171,6 +210,21 @@ function loadCompleted(model) {
     })
 }
 
+// What was finished today, for the foot of the Today view and its ring. A
+// recurring task that was done today has moved on to its next date and is
+// not done, but its doneAt says today, so it counts as well.
+function loadDoneToday(model) {
+    model.clear()
+    db().readTransaction(function (tx) {
+        var rs = tx.executeSql("SELECT id, title, IFNULL(listName,'') AS listName, done, doneAt, repeatEvery FROM tasks WHERE parentId = 0 AND doneAt >= ? ORDER BY doneAt ASC, id ASC", [Dates.startOfTodayMs()])
+        for (var i = 0; i < rs.rows.length; i++) {
+            var r = rs.rows.item(i)
+            model.append({ taskId: r.id, title: text(r.title), listName: text(r.listName),
+                           done: r.done, doneAt: r.doneAt, repeatEvery: r.repeatEvery })
+        }
+    })
+}
+
 function getTask(id) {
     var out = null
     db().readTransaction(function (tx) {
@@ -181,11 +235,12 @@ function getTask(id) {
 }
 
 // Every list name in use, alphabetically. There is no lists table: a list
-// exists exactly as long as a task names it.
+// exists exactly as long as a task names it -- or, for a list synced with the
+// server, as long as it is synced, so an emptied shared list stays in view.
 function lists() {
     var out = []
     db().readTransaction(function (tx) {
-        var rs = tx.executeSql("SELECT DISTINCT listName FROM tasks WHERE IFNULL(listName,'') != '' AND done = 0 ORDER BY listName COLLATE NOCASE ASC", [])
+        var rs = tx.executeSql("SELECT listName FROM tasks WHERE IFNULL(listName,'') != '' AND done = 0 UNION SELECT listName FROM remote_lists WHERE enabled = 1 AND isDefault = 0 AND IFNULL(listName,'') != '' ORDER BY 1 COLLATE NOCASE ASC", [])
         for (var i = 0; i < rs.rows.length; i++) out.push(rs.rows.item(i).listName)
     })
     return out
@@ -230,7 +285,8 @@ function addTask(title, listName, dueDate) {
     var id = -1
     var idx = nextSortIndex(0)
     db().transaction(function (tx) {
-        var rs = tx.executeSql("INSERT INTO tasks (title, note, listName, parentId, done, doneAt, dueDate, dueTime, repeatEvery, repeatUnit, sortIndex, createdAt) VALUES (?, '', ?, 0, 0, 0, ?, '', 0, '', ?, ?)", [title, listName || "", dueDate || "", idx, new Date().getTime()])
+        var now = new Date().getTime()
+        var rs = tx.executeSql("INSERT INTO tasks (title, note, listName, parentId, done, doneAt, dueDate, dueTime, repeatEvery, repeatUnit, sortIndex, createdAt, dirty, modifiedAt) VALUES (?, '', ?, 0, 0, 0, ?, '', 0, '', ?, ?, 1, ?)", [title, listName || "", dueDate || "", idx, now, now])
         id = parseInt(rs.insertId, 10)
     })
     return id
@@ -241,7 +297,8 @@ function addSubtask(parentId, title) {
     db().transaction(function (tx) {
         var rs = tx.executeSql("SELECT COALESCE(MAX(sortIndex), -1) + 1 AS hi FROM tasks WHERE parentId = ?", [parentId])
         var idx = rs.rows.item(0).hi
-        var ins = tx.executeSql("INSERT INTO tasks (title, note, listName, parentId, done, doneAt, dueDate, dueTime, repeatEvery, repeatUnit, sortIndex, createdAt) VALUES (?, '', '', ?, 0, 0, '', '', 0, '', ?, ?)", [title, parentId, idx, new Date().getTime()])
+        var now = new Date().getTime()
+        var ins = tx.executeSql("INSERT INTO tasks (title, note, listName, parentId, done, doneAt, dueDate, dueTime, repeatEvery, repeatUnit, sortIndex, createdAt, dirty, modifiedAt) VALUES (?, '', '', ?, 0, 0, '', '', 0, '', ?, ?, 1, ?)", [title, parentId, idx, now, now])
         id = parseInt(ins.insertId, 10)
     })
     return id
@@ -263,16 +320,27 @@ var WRITABLE = ["title", "note", "listName", "dueDate", "dueTime",
                 "exportToCalendar", "calendarEventId", "remindMinutes",
                 "remindAt", "alarmCookie"]
 
+// The columns a synced copy carries. A change to any other (the calendar
+// event's id, say) is this phone's business and is not sent anywhere.
+var SYNCED = ["title", "note", "listName", "dueDate", "dueTime", "repeatEvery",
+              "repeatUnit", "done", "doneAt", "sortIndex"]
+
 function updateTask(id, fields) {
     var sets = [], args = []
+    var synced = false
     for (var k in fields) {
         if (WRITABLE.indexOf(k) < 0) continue
         var v = fields[k]
         if (TEXT_COLUMNS.indexOf(k) >= 0 && (v === null || v === undefined)) v = ""
         sets.push(k + " = ?")
         args.push(v)
+        if (SYNCED.indexOf(k) >= 0) synced = true
     }
     if (sets.length === 0) return
+    if (synced) {
+        sets.push("dirty = 1", "modifiedAt = ?")
+        args.push(new Date().getTime())
+    }
     args.push(id)
     db().transaction(function (tx) {
         tx.executeSql("UPDATE tasks SET " + sets.join(", ") + " WHERE id = ?", args)
@@ -282,8 +350,11 @@ function updateTask(id, fields) {
 // Real delete. No soft-delete, no append-only history -- this is a task list,
 // not Fiat Mos. The remorse timer on the swipe is the only safety net, and
 // for a to-do it is enough. Subtasks go with the parent.
+// A task the server has is remembered as a tombstone, so the next sync can
+// delete it there too.
 function deleteTask(id) {
     db().transaction(function (tx) {
+        tx.executeSql("INSERT OR REPLACE INTO tombstones (href, etag) SELECT remoteHref, IFNULL(remoteEtag,'') FROM tasks WHERE (id = ? OR parentId = ?) AND IFNULL(remoteHref,'') != ''", [id, id])
         tx.executeSql("DELETE FROM tasks WHERE id = ? OR parentId = ?", [id, id])
     })
 }
@@ -328,21 +399,24 @@ function setDone(id, done) {
 
     if (done && t.repeatEvery > 0 && t.dueDate !== "") {
         var next = Dates.nextOccurrence(t.dueDate, t.repeatEvery, t.repeatUnit)
+        var stamp = new Date().getTime()
         db().transaction(function (tx) {
-            tx.executeSql("UPDATE tasks SET dueDate = ?, done = 0, doneAt = ? WHERE id = ?", [next, new Date().getTime(), id])
-            tx.executeSql("UPDATE tasks SET done = 0, doneAt = 0 WHERE parentId = ?", [id])
+            tx.executeSql("UPDATE tasks SET dueDate = ?, done = 0, doneAt = ?, dirty = 1, modifiedAt = ? WHERE id = ?", [next, stamp, stamp, id])
+            tx.executeSql("UPDATE tasks SET done = 0, doneAt = 0, dirty = 1, modifiedAt = ? WHERE parentId = ? AND done = 1", [stamp, id])
         })
         return next
     }
 
+    var now = new Date().getTime()
     db().transaction(function (tx) {
-        tx.executeSql("UPDATE tasks SET done = ?, doneAt = ? WHERE id = ?", [done ? 1 : 0, done ? new Date().getTime() : 0, id])
+        tx.executeSql("UPDATE tasks SET done = ?, doneAt = ?, dirty = 1, modifiedAt = ? WHERE id = ?", [done ? 1 : 0, done ? now : 0, now, id])
     })
     return ""
 }
 
 function clearCompleted() {
     db().transaction(function (tx) {
+        tx.executeSql("INSERT OR REPLACE INTO tombstones (href, etag) SELECT remoteHref, IFNULL(remoteEtag,'') FROM tasks WHERE (parentId IN (SELECT id FROM tasks WHERE done = 1 AND parentId = 0) OR (done = 1 AND parentId = 0)) AND IFNULL(remoteHref,'') != ''", [])
         tx.executeSql("DELETE FROM tasks WHERE parentId IN (SELECT id FROM tasks WHERE done = 1 AND parentId = 0)", [])
         tx.executeSql("DELETE FROM tasks WHERE done = 1 AND parentId = 0", [])
     })
@@ -353,9 +427,10 @@ function clearCompleted() {
 // Called once when the finger lifts, not on every swap: the model already
 // shows the new order, the database just has to agree with it.
 function saveOrder(model) {
+    var now = new Date().getTime()
     db().transaction(function (tx) {
         for (var i = 0; i < model.count; i++)
-            tx.executeSql("UPDATE tasks SET sortIndex = ? WHERE id = ?", [i, model.get(i).taskId])
+            tx.executeSql("UPDATE tasks SET sortIndex = ?, dirty = 1, modifiedAt = ? WHERE id = ? AND sortIndex != ?", [i, now, model.get(i).taskId, i])
     })
 }
 
@@ -371,4 +446,514 @@ function defer(id) {
     var next = Dates.addDays(base, 1)
     updateTask(id, { dueDate: next })
     return next
+}
+
+// ------------------------------------------------------------------ sync --
+//
+// Everything below is for Sync.js. A synced list is a server task list
+// (remote_lists) tied to a list name here; "tasks without a list" can be tied
+// to one more. Settings never delete anything on the server: switching a list
+// off only lets go of it here.
+
+function remoteLists() {
+    var out = []
+    db().readTransaction(function (tx) {
+        var rs = tx.executeSql("SELECT href, name, IFNULL(color,'') AS color, IFNULL(listName,'') AS listName, enabled, isDefault FROM remote_lists ORDER BY name COLLATE NOCASE ASC", [])
+        for (var i = 0; i < rs.rows.length; i++) {
+            var r = rs.rows.item(i)
+            out.push({ href: r.href, name: r.name, color: r.color, listName: r.listName,
+                       enabled: r.enabled === 1, isDefault: r.isDefault === 1 })
+        }
+    })
+    return out
+}
+
+function detachTasks(tx, where, args) {
+    tx.executeSql("UPDATE tasks SET remoteUid = '', remoteHref = '', remoteEtag = '', remoteList = '', remoteIcs = '', dirty = 1 WHERE " + where, args)
+}
+
+// What the server says it has. New lists arrive switched off; a synced list
+// renamed on the server takes its list here along; one that is gone lets go.
+function updateRemoteLists(found) {
+    var known = remoteLists()
+    db().transaction(function (tx) {
+        var seen = {}
+        for (var i = 0; i < found.length; i++) {
+            var f = found[i]
+            seen[f.href] = true
+            var old = null
+            for (var j = 0; j < known.length; j++)
+                if (known[j].href === f.href) old = known[j]
+            if (old === null) {
+                tx.executeSql("INSERT INTO remote_lists (href, name, color, listName, enabled, isDefault) VALUES (?, ?, ?, '', 0, 0)", [f.href, f.name, f.color || ""])
+                continue
+            }
+            tx.executeSql("UPDATE remote_lists SET name = ?, color = ? WHERE href = ?", [f.name, f.color || "", f.href])
+            if (old.enabled && !old.isDefault && old.listName !== "" && old.name !== f.name) {
+                tx.executeSql("UPDATE tasks SET listName = ? WHERE listName = ?", [f.name, old.listName])
+                tx.executeSql("UPDATE remote_lists SET listName = ? WHERE href = ?", [f.name, f.href])
+            }
+        }
+        for (var k = 0; k < known.length; k++) {
+            if (seen[known[k].href]) continue
+            detachTasks(tx, "remoteList = ?", [known[k].href])
+            tx.executeSql("DELETE FROM remote_lists WHERE href = ?", [known[k].href])
+        }
+    })
+}
+
+// Tie a server list to a list here: by its own name, or as the home of the
+// tasks that have no list.
+function syncList(href, asDefault) {
+    var all = remoteLists()
+    var me = null
+    for (var i = 0; i < all.length; i++)
+        if (all[i].href === href) me = all[i]
+    if (me === null) return
+    db().transaction(function (tx) {
+        if (asDefault) {
+            for (var j = 0; j < all.length; j++) {
+                if (all[j].isDefault && all[j].href !== href) {
+                    detachTasks(tx, "remoteList = ?", [all[j].href])
+                    tx.executeSql("UPDATE remote_lists SET enabled = 0, isDefault = 0 WHERE href = ?", [all[j].href])
+                }
+            }
+            if (me.enabled && !me.isDefault)
+                detachTasks(tx, "remoteList = ?", [href])
+            tx.executeSql("UPDATE remote_lists SET enabled = 1, isDefault = 1, listName = '' WHERE href = ?", [href])
+            return
+        }
+        var name = me.name
+        var taken = function (n) {
+            for (var k = 0; k < all.length; k++)
+                if (all[k].href !== href && all[k].enabled && !all[k].isDefault && all[k].listName === n) return true
+            return false
+        }
+        var n = 2
+        while (taken(name)) name = me.name + " " + (n++)
+        if (me.isDefault)
+            detachTasks(tx, "remoteList = ?", [href])
+        tx.executeSql("UPDATE remote_lists SET enabled = 1, isDefault = 0, listName = ? WHERE href = ?", [name, href])
+    })
+}
+
+// Where the tasks without a list live on the server. A list that was synced
+// as a list of its own becomes the home: its tasks here lose the list name and
+// keep their place on the server, so nothing is sent twice. The old home
+// becomes a list like any other; the tasks without a list still point at it,
+// so the next run moves them across instead of copying them.
+function setHome(href) {
+    var all = remoteLists()
+    var home = null
+    for (var i = 0; i < all.length; i++) if (all[i].href === href) home = all[i]
+    if (home === null) return
+    db().transaction(function (tx) {
+        if (home.enabled && !home.isDefault && home.listName !== "")
+            tx.executeSql("UPDATE tasks SET listName = '' WHERE listName = ?", [home.listName])
+        for (var o = 0; o < all.length; o++)
+            if (all[o].isDefault && all[o].href !== href)
+                tx.executeSql("UPDATE remote_lists SET isDefault = 0, enabled = 1, listName = ? WHERE href = ?", [all[o].name, all[o].href])
+        tx.executeSql("UPDATE remote_lists SET enabled = 1, isDefault = 1, listName = '' WHERE href = ?", [href])
+    })
+}
+
+// With sync on, everything on the phone is synced: the tasks without a list
+// with one list on the server, and every list here with the server's list of
+// the same name. Lists only the server has come here too. Returns the names
+// of lists the server still needs; the caller makes them and calls again.
+function syncEverything() {
+    var all = remoteLists()
+    var here = []
+    db().readTransaction(function (tx) {
+        var rs = tx.executeSql("SELECT DISTINCT listName FROM tasks WHERE IFNULL(listName,'') != ''", [])
+        for (var i = 0; i < rs.rows.length; i++) here.push(rs.rows.item(i).listName)
+    })
+    var lower = function (v) { return String(v).toLowerCase() }
+    var isHere = function (name) {
+        for (var i = 0; i < here.length; i++) if (lower(here[i]) === lower(name)) return true
+        return false
+    }
+
+    // The home for tasks without a list: the one already chosen, else the
+    // server's own "Tasks" or "Personal", else any list that is not one of
+    // the phone's. Never a list the phone has by name, or that list would
+    // swallow the tasks that have none.
+    var home = null
+    for (var d = 0; d < all.length; d++) if (all[d].enabled && all[d].isDefault) home = all[d]
+    var prefer = ["tasks", "personal"]
+    for (var p = 0; home === null && p < prefer.length; p++)
+        for (var q = 0; q < all.length; q++)
+            if (lower(all[q].name) === prefer[p] && !isHere(all[q].name)) { home = all[q]; break }
+    for (var r = 0; home === null && r < all.length; r++)
+        if (!isHere(all[r].name)) home = all[r]
+
+    var missing = []
+    if (home === null) missing.push("Tasks")
+    else if (!home.isDefault || !home.enabled) setHome(home.href)
+
+    all = remoteLists()
+    for (var k = 0; k < all.length; k++)
+        if (!all[k].enabled && (home === null || all[k].href !== home.href)) syncList(all[k].href, false)
+
+    all = remoteLists()
+    for (var m = 0; m < here.length; m++) {
+        var found = false
+        for (var n = 0; n < all.length; n++)
+            if (all[n].enabled && !all[n].isDefault && lower(all[n].listName) === lower(here[m])) found = true
+        if (!found) missing.push(here[m])
+    }
+    return missing
+}
+
+function unsyncList(href) {
+    db().transaction(function (tx) {
+        detachTasks(tx, "remoteList = ?", [href])
+        tx.executeSql("UPDATE remote_lists SET enabled = 0, isDefault = 0 WHERE href = ?", [href])
+    })
+}
+
+// Signing out lets go of everything; the tasks stay on the phone.
+function forgetServer() {
+    db().transaction(function (tx) {
+        detachTasks(tx, "IFNULL(remoteList,'') != ''", [])
+        tx.executeSql("DELETE FROM remote_lists", [])
+        tx.executeSql("DELETE FROM tombstones", [])
+    })
+}
+
+function syncTasks() {
+    var out = []
+    db().readTransaction(function (tx) {
+        var rs = tx.executeSql("SELECT id, title, IFNULL(note,'') AS note, IFNULL(listName,'') AS listName, parentId, done, doneAt, IFNULL(dueDate,'') AS dueDate, IFNULL(dueTime,'') AS dueTime, repeatEvery, IFNULL(repeatUnit,'') AS repeatUnit, sortIndex, exportToCalendar, IFNULL(calendarEventId,'') AS calendarEventId, IFNULL(remoteUid,'') AS remoteUid, IFNULL(remoteHref,'') AS remoteHref, IFNULL(remoteEtag,'') AS remoteEtag, IFNULL(remoteList,'') AS remoteList, IFNULL(remoteIcs,'') AS remoteIcs, IFNULL(dirty,1) AS dirty, IFNULL(modifiedAt,0) AS modifiedAt FROM tasks ORDER BY parentId ASC, id ASC", [])
+        for (var i = 0; i < rs.rows.length; i++) {
+            var r = rs.rows.item(i)
+            out.push({ id: r.id, title: r.title, note: r.note, listName: r.listName, parentId: r.parentId,
+                       done: r.done, doneAt: r.doneAt, dueDate: r.dueDate, dueTime: r.dueTime,
+                       repeatEvery: r.repeatEvery, repeatUnit: r.repeatUnit, sortIndex: r.sortIndex,
+                       exportToCalendar: r.exportToCalendar, calendarEventId: r.calendarEventId,
+                       remoteUid: r.remoteUid, remoteHref: r.remoteHref, remoteEtag: r.remoteEtag,
+                       remoteList: r.remoteList, remoteIcs: r.remoteIcs, dirty: r.dirty, modifiedAt: r.modifiedAt })
+        }
+    })
+    return out
+}
+
+var REMOTE_WRITABLE = ["title", "note", "listName", "parentId", "done", "doneAt", "dueDate", "dueTime",
+                       "repeatEvery", "repeatUnit", "sortIndex", "remoteUid", "remoteHref", "remoteEtag",
+                       "remoteList", "remoteIcs", "dirty", "modifiedAt"]
+
+// A write that came from the server: it does not mark the task as changed.
+function applyRemote(id, fields) {
+    var sets = [], args = []
+    for (var k in fields) {
+        if (REMOTE_WRITABLE.indexOf(k) < 0) continue
+        var v = fields[k]
+        if (v === null || v === undefined) v = (k === "parentId" || k === "done" || k === "doneAt" || k === "repeatEvery" || k === "sortIndex" || k === "dirty" || k === "modifiedAt") ? 0 : ""
+        sets.push(k + " = ?")
+        args.push(v)
+    }
+    if (sets.length === 0) return
+    args.push(id)
+    db().transaction(function (tx) {
+        tx.executeSql("UPDATE tasks SET " + sets.join(", ") + " WHERE id = ?", args)
+    })
+}
+
+function insertRemote(fields) {
+    var id = -1
+    var now = new Date().getTime()
+    db().transaction(function (tx) {
+        var rs = tx.executeSql("INSERT INTO tasks (title, note, listName, parentId, done, doneAt, dueDate, dueTime, repeatEvery, repeatUnit, sortIndex, createdAt, remoteUid, remoteHref, remoteEtag, remoteList, remoteIcs, dirty, modifiedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)",
+            [fields.title || "", fields.note || "", fields.listName || "", fields.parentId || 0,
+             fields.done || 0, fields.doneAt || 0, fields.dueDate || "", fields.dueTime || "",
+             fields.repeatEvery || 0, fields.repeatUnit || "", fields.sortIndex || 0, now,
+             fields.remoteUid || "", fields.remoteHref || "", fields.remoteEtag || "",
+             fields.remoteList || "", fields.remoteIcs || "", fields.modifiedAt || now])
+        id = parseInt(rs.insertId, 10)
+    })
+    return id
+}
+
+// Sent: the server copy is recorded, and the task is clean again unless it
+// was changed once more while the request was on its way.
+function markSent(id, sentAt, fields) {
+    applyRemote(id, fields)
+    db().transaction(function (tx) {
+        tx.executeSql("UPDATE tasks SET dirty = 0 WHERE id = ? AND IFNULL(modifiedAt,0) = ?", [id, sentAt])
+    })
+}
+
+// Gone from the server and not changed here: gone here too. No tombstone,
+// the server already has nothing to delete.
+function deleteLocal(id) {
+    db().transaction(function (tx) {
+        tx.executeSql("DELETE FROM tasks WHERE id = ? OR parentId = ?", [id, id])
+    })
+}
+
+function detachTask(id) {
+    db().transaction(function (tx) {
+        detachTasks(tx, "id = ?", [id])
+    })
+}
+
+function tombstones() {
+    var out = []
+    db().readTransaction(function (tx) {
+        var rs = tx.executeSql("SELECT href, IFNULL(etag,'') AS etag FROM tombstones", [])
+        for (var i = 0; i < rs.rows.length; i++) out.push({ href: rs.rows.item(i).href, etag: rs.rows.item(i).etag })
+    })
+    return out
+}
+
+function dropTombstone(href) {
+    db().transaction(function (tx) {
+        tx.executeSql("DELETE FROM tombstones WHERE href = ?", [href])
+    })
+}
+
+// How much is waiting to be sent: deletions, and changed tasks that live (or
+// will live) in a synced list.
+function pendingCount() {
+    var n = 0
+    db().readTransaction(function (tx) {
+        var a = tx.executeSql("SELECT COUNT(*) AS n FROM tombstones", [])
+        n += a.rows.item(0).n
+        var b = tx.executeSql("SELECT COUNT(*) AS n FROM tasks t LEFT JOIN tasks p ON t.parentId = p.id WHERE IFNULL(t.dirty,1) = 1 AND (IFNULL(t.remoteHref,'') != '' OR (t.parentId = 0 AND IFNULL(t.listName,'') IN (SELECT IFNULL(listName,'') FROM remote_lists WHERE enabled = 1)) OR (t.parentId != 0 AND IFNULL(p.listName,'') IN (SELECT IFNULL(listName,'') FROM remote_lists WHERE enabled = 1)))", [])
+        n += b.rows.item(0).n
+    })
+    return n
+}
+
+// ---------------------------------------------------- lists on the phone --
+//
+// The phone's own household. Everything comes back in the shape Pantry sends,
+// so the Lists pages cannot tell the two apart. Shelf.js does the routing.
+
+function nowSeconds() { return Math.floor(new Date().getTime() / 1000) }
+
+function shelfList(r) {
+    return { id: r.id, houseId: -1, name: text(r.name), description: text(r.description),
+             color: text(r.color), icon: "", sortOrder: r.sortOrder, canEdit: true,
+             createdAt: r.createdAt, updatedAt: r.updatedAt }
+}
+
+function shelfItem(r) {
+    return { id: r.id, listId: r.listId, name: text(r.name), description: text(r.description),
+             quantity: text(r.quantity), categoryId: r.categoryId > 0 ? r.categoryId : null,
+             done: r.done === 1, doneAt: r.doneAt > 0 ? r.doneAt : null, rrule: text(r.rrule),
+             repeatFromCompletion: r.repeatFromCompletion === 1, deleteOnDone: r.deleteOnDone === 1,
+             nextDueAt: r.nextDueAt > 0 ? r.nextDueAt : null, imageFileId: null, addedBy: "",
+             sortOrder: r.sortOrder, createdAt: r.createdAt, updatedAt: r.updatedAt }
+}
+
+function shelfCategory(r) {
+    return { id: r.id, houseId: -1, listId: r.listId > 0 ? r.listId : null, name: text(r.name),
+             color: text(r.color), icon: text(r.icon), sortOrder: r.sortOrder, createdAt: r.createdAt }
+}
+
+var ITEM_COLUMNS = "id, listId, name, IFNULL(description,'') AS description, IFNULL(quantity,'') AS quantity, categoryId, done, doneAt, IFNULL(rrule,'') AS rrule, repeatFromCompletion, deleteOnDone, nextDueAt, sortOrder, createdAt, updatedAt"
+
+function shelfRow(table, id, wrap) {
+    var out = null
+    db().readTransaction(function (tx) {
+        var cols = table === "shelf_items" ? ITEM_COLUMNS : "*"
+        var rs = tx.executeSql("SELECT " + cols + " FROM " + table + " WHERE id = ?", [id])
+        if (rs.rows.length > 0) out = wrap(rs.rows.item(0))
+    })
+    return out
+}
+
+// ---- lists ----
+
+function shelfLists() {
+    var out = []
+    db().readTransaction(function (tx) {
+        var rs = tx.executeSql("SELECT * FROM shelf_lists ORDER BY sortOrder ASC, id ASC", [])
+        for (var i = 0; i < rs.rows.length; i++) out.push(shelfList(rs.rows.item(i)))
+    })
+    return out
+}
+
+function shelfAddList(f) {
+    var now = nowSeconds(), id = 0
+    db().transaction(function (tx) {
+        var rs = tx.executeSql("SELECT IFNULL(MAX(sortOrder), -1) + 1 AS n FROM shelf_lists", [])
+        var ins = tx.executeSql("INSERT INTO shelf_lists (name, description, color, sortOrder, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)",
+                                [f.name || "", f.description || "", f.color || "", rs.rows.item(0).n, now, now])
+        id = parseInt(ins.insertId, 10)
+    })
+    return shelfRow("shelf_lists", id, shelfList)
+}
+
+function shelfUpdateList(id, f) {
+    var sets = [], args = []
+    var keys = ["name", "description", "color"]
+    for (var i = 0; i < keys.length; i++)
+        if (f[keys[i]] !== undefined) { sets.push(keys[i] + " = ?"); args.push(f[keys[i]] === null ? "" : String(f[keys[i]])) }
+    if (sets.length > 0) {
+        sets.push("updatedAt = ?"); args.push(nowSeconds()); args.push(id)
+        db().transaction(function (tx) { tx.executeSql("UPDATE shelf_lists SET " + sets.join(", ") + " WHERE id = ?", args) })
+    }
+    return shelfRow("shelf_lists", id, shelfList)
+}
+
+function shelfDeleteList(id) {
+    db().transaction(function (tx) {
+        tx.executeSql("DELETE FROM shelf_items WHERE listId = ?", [id])
+        tx.executeSql("DELETE FROM shelf_categories WHERE listId = ?", [id])
+        tx.executeSql("DELETE FROM shelf_lists WHERE id = ?", [id])
+    })
+}
+
+// ---- items ----
+
+// A repeating item that was ticked off comes back on the day it is due again.
+function shelfRevive() {
+    var now = nowSeconds()
+    db().transaction(function (tx) {
+        tx.executeSql("UPDATE shelf_items SET done = 0, doneAt = 0, nextDueAt = 0, updatedAt = ? WHERE done = 1 AND nextDueAt > 0 AND nextDueAt <= ?", [now, now])
+    })
+}
+
+// listId 0 is every list.
+function shelfItems(listId) {
+    shelfRevive()
+    var out = []
+    db().readTransaction(function (tx) {
+        var rs = listId > 0
+            ? tx.executeSql("SELECT " + ITEM_COLUMNS + " FROM shelf_items WHERE listId = ? ORDER BY sortOrder ASC, id ASC", [listId])
+            : tx.executeSql("SELECT " + ITEM_COLUMNS + " FROM shelf_items ORDER BY listId ASC, sortOrder ASC, id ASC", [])
+        for (var i = 0; i < rs.rows.length; i++) out.push(shelfItem(rs.rows.item(i)))
+    })
+    return out
+}
+
+var ITEM_TEXT = ["name", "description", "quantity", "rrule"]
+var ITEM_FLAGS = ["repeatFromCompletion", "deleteOnDone"]
+
+function shelfAddItem(listId, f) {
+    var now = nowSeconds(), id = 0
+    db().transaction(function (tx) {
+        var rs = tx.executeSql("SELECT IFNULL(MAX(sortOrder), -1) + 1 AS n FROM shelf_items WHERE listId = ?", [listId])
+        var ins = tx.executeSql("INSERT INTO shelf_items (listId, name, description, quantity, categoryId, rrule, repeatFromCompletion, deleteOnDone, sortOrder, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                [listId, f.name || "", f.description || "", f.quantity || "", f.categoryId > 0 ? f.categoryId : 0,
+                                 f.rrule || "", f.repeatFromCompletion ? 1 : 0, f.deleteOnDone ? 1 : 0, rs.rows.item(0).n, now, now])
+        id = parseInt(ins.insertId, 10)
+    })
+    return shelfRow("shelf_items", id, shelfItem)
+}
+
+// "" clears a text, categoryId 0 clears the category: the same rules as Pantry.
+function shelfUpdateItem(id, f) {
+    var sets = [], args = []
+    for (var i = 0; i < ITEM_TEXT.length; i++)
+        if (f[ITEM_TEXT[i]] !== undefined) { sets.push(ITEM_TEXT[i] + " = ?"); args.push(f[ITEM_TEXT[i]] === null ? "" : String(f[ITEM_TEXT[i]])) }
+    for (var j = 0; j < ITEM_FLAGS.length; j++)
+        if (f[ITEM_FLAGS[j]] !== undefined) { sets.push(ITEM_FLAGS[j] + " = ?"); args.push(f[ITEM_FLAGS[j]] ? 1 : 0) }
+    if (f.categoryId !== undefined) { sets.push("categoryId = ?"); args.push(f.categoryId > 0 ? f.categoryId : 0) }
+    // A changed rule starts counting again from now.
+    if (f.rrule !== undefined) sets.push("nextDueAt = CASE WHEN done = 1 THEN nextDueAt ELSE 0 END")
+    if (sets.length > 0) {
+        sets.push("updatedAt = ?"); args.push(nowSeconds()); args.push(id)
+        db().transaction(function (tx) { tx.executeSql("UPDATE shelf_items SET " + sets.join(", ") + " WHERE id = ?", args) })
+    }
+    return shelfRow("shelf_items", id, shelfItem)
+}
+
+function shelfDeleteItems(ids) {
+    db().transaction(function (tx) {
+        for (var i = 0; i < ids.length; i++) tx.executeSql("DELETE FROM shelf_items WHERE id = ?", [ids[i]])
+    })
+}
+
+// The next time a repeating item is wanted: the rule's step from now, at the
+// start of that day.
+function shelfNextDue(rrule, fromSeconds) {
+    var freq = "", interval = 1
+    var parts = text(rrule).replace(/^RRULE:/, "").split(";")
+    for (var i = 0; i < parts.length; i++) {
+        var kv = parts[i].split("=")
+        var k = (kv[0] || "").toUpperCase(), v = (kv[1] || "").toUpperCase()
+        if (k === "FREQ") freq = v
+        else if (k === "INTERVAL") interval = Math.max(1, parseInt(v, 10) || 1)
+    }
+    if (freq === "") return 0
+    var d = new Date(fromSeconds * 1000)
+    d.setHours(0, 0, 0, 0)
+    var iso = Dates.iso(d)
+    if (freq === "DAILY") iso = Dates.advance(iso, interval, "day")
+    else if (freq === "WEEKLY") iso = Dates.advance(iso, interval, "week")
+    else if (freq === "MONTHLY") iso = Dates.advance(iso, interval, "month")
+    else if (freq === "YEARLY") iso = Dates.advance(iso, interval * 12, "month")
+    else return 0
+    return Math.floor(Dates.fromISO(iso).getTime() / 1000)
+}
+
+// Answers like Pantry's toggle: the item as it is now, or, for one that goes
+// away when done, its id with deletedAt.
+function shelfToggle(id) {
+    var it = shelfRow("shelf_items", id, shelfItem)
+    if (it === null) return null
+    var now = nowSeconds()
+    if (!it.done && it.deleteOnDone && it.rrule === "") {
+        shelfDeleteItems([id])
+        return { id: id, deletedAt: now }
+    }
+    db().transaction(function (tx) {
+        if (it.done)
+            tx.executeSql("UPDATE shelf_items SET done = 0, doneAt = 0, nextDueAt = 0, updatedAt = ? WHERE id = ?", [now, id])
+        else
+            tx.executeSql("UPDATE shelf_items SET done = 1, doneAt = ?, nextDueAt = ?, updatedAt = ? WHERE id = ?", [now, shelfNextDue(it.rrule, now), now, id])
+    })
+    return shelfRow("shelf_items", id, shelfItem)
+}
+
+function shelfUncheck(ids) {
+    var now = nowSeconds()
+    db().transaction(function (tx) {
+        for (var i = 0; i < ids.length; i++)
+            tx.executeSql("UPDATE shelf_items SET done = 0, doneAt = 0, nextDueAt = 0, updatedAt = ? WHERE id = ?", [now, ids[i]])
+    })
+}
+
+// ---- categories ----
+
+function shelfCategories() {
+    var out = []
+    db().readTransaction(function (tx) {
+        var rs = tx.executeSql("SELECT * FROM shelf_categories ORDER BY sortOrder ASC, id ASC", [])
+        for (var i = 0; i < rs.rows.length; i++) out.push(shelfCategory(rs.rows.item(i)))
+    })
+    return out
+}
+
+function shelfAddCategory(f) {
+    var now = nowSeconds(), id = 0
+    db().transaction(function (tx) {
+        var rs = tx.executeSql("SELECT IFNULL(MAX(sortOrder), -1) + 1 AS n FROM shelf_categories", [])
+        var ins = tx.executeSql("INSERT INTO shelf_categories (listId, name, color, icon, sortOrder, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+                                [f.listId > 0 ? f.listId : 0, f.name || "", f.color || "", f.icon || "", rs.rows.item(0).n, now])
+        id = parseInt(ins.insertId, 10)
+    })
+    return shelfRow("shelf_categories", id, shelfCategory)
+}
+
+function shelfUpdateCategory(id, f) {
+    var sets = [], args = []
+    var keys = ["name", "color", "icon"]
+    for (var i = 0; i < keys.length; i++)
+        if (f[keys[i]] !== undefined) { sets.push(keys[i] + " = ?"); args.push(f[keys[i]] === null ? "" : String(f[keys[i]])) }
+    if (sets.length > 0) {
+        args.push(id)
+        db().transaction(function (tx) { tx.executeSql("UPDATE shelf_categories SET " + sets.join(", ") + " WHERE id = ?", args) })
+    }
+    return shelfRow("shelf_categories", id, shelfCategory)
+}
+
+function shelfDeleteCategory(id) {
+    db().transaction(function (tx) {
+        tx.executeSql("UPDATE shelf_items SET categoryId = 0 WHERE categoryId = ?", [id])
+        tx.executeSql("DELETE FROM shelf_categories WHERE id = ?", [id])
+    })
 }

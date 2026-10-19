@@ -27,12 +27,10 @@ Page {
 
     property int taskId: -1
     property var task: null
-    property var listNames: []
 
     // Revealed by "Every ...", so the custom controls can be open before the
     // value has actually changed.
     property bool customRepeat: false
-    property bool newListOpen: false
 
     // Which subtask is open as a field, and which is counting down to
     // deletion. Ids, not indices -- an index stops meaning anything the
@@ -70,7 +68,6 @@ Page {
         task = Storage.getTask(taskId)
         if (task === null) { pageStack.pop(); return }
 
-        listNames = Storage.lists()
         titleField.text = task.title
         noteField.text = task.note
         customRepeat = task.repeatEvery > 1
@@ -490,63 +487,6 @@ Page {
                 text: page.task !== null && page.task.dueTime !== ""
                       ? qsTr("Before it is due. The calendar entry carries the reminder, so it fires whether or not this app is running.")
                       : qsTr("Before 09:00 on the day. A whole-day task has no hour of its own, so the morning stands in for one.")
-            }
-
-            // -- List ----------------------------------------------------------
-            //
-            // Lists are a name on the task, nothing more. A list exists for
-            // exactly as long as something is in it, which is why there is no
-            // screen for managing lists and no tag taxonomy on top.
-
-            SectionLabel {
-                x: Theme.horizontalPageMargin
-                text: qsTr("List")
-            }
-
-            Flow {
-                x: Theme.horizontalPageMargin
-                width: parent.width - Theme.horizontalPageMargin * 2
-                spacing: Theme.paddingSmall
-
-                Pill {
-                    text: qsTr("None")
-                    selected: page.task !== null && page.task.listName === ""
-                    onClicked: { page.newListOpen = false; page.save({ listName: "" }) }
-                }
-                Repeater {
-                    model: page.listNames
-                    Pill {
-                        text: modelData
-                        selected: page.task !== null && page.task.listName === modelData
-                        onClicked: { page.newListOpen = false; page.save({ listName: modelData }) }
-                    }
-                }
-                Pill {
-                    text: qsTr("New ...")
-                    selected: page.newListOpen
-                    onClicked: { page.newListOpen = true; newListField.forceActiveFocus() }
-                }
-            }
-
-            TextField {
-                id: newListField
-                width: parent.width
-                visible: page.newListOpen
-                label: qsTr("List name")
-                placeholderText: qsTr("List name")
-                color: FiatAgendaTheme.primaryText
-                inputMethodHints: Qt.ImhNoPredictiveText
-                EnterKey.iconSource: "image://theme/icon-m-enter-accept"
-                EnterKey.onClicked: {
-                    var n = text.replace(/^\s+|\s+$/g, "")
-                    if (n !== "") {
-                        page.save({ listName: n })
-                        page.listNames = Storage.lists()
-                    }
-                    text = ""
-                    page.newListOpen = false
-                    focus = false
-                }
             }
 
             // -- Note ----------------------------------------------------------

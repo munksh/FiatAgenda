@@ -1,38 +1,29 @@
 /*
  * Fiat Agenda -- entry point.
  *
- * All state lives in QML's LocalStorage and the platform calendar, so there
- * is nothing to register here. The one thing C++ still has to do is hand QML
- * the version string: QML cannot read the rpm spec, and a number typed into
- * the about page by hand is a number that will one day be wrong.
+ * Tasks live in QML's LocalStorage and, when asked, in the platform calendar.
+ * What C++ adds is the network: a Nextcloud account, the Pantry API for the
+ * household's lists, and CalDAV for syncing tasks with Nextcloud Tasks. Each
+ * is handed to QML as a context property on the ROOT context, so the cover
+ * sees them too -- it is loaded by URL and cannot see ids in the root QML.
  *
- * APP_VERSION comes from the .pro, which takes it from the spec:
+ * APP_VERSION comes from the .pro, which takes it from the spec
+ * (%qmake5 APP_VERSION=%{version}).
  *
- *     %build
- *     %qmake5 APP_VERSION=%{version}
- *
- * So SailfishApp::main() is replaced by what it does internally -- an
- * application, a view, a source -- with one extra line in the middle. Nothing
- * else changes; this IS the template's other documented form.
- *
- * setContextProperty on the ROOT context, so the cover page sees it too. The
- * cover is loaded by URL and cannot see ids declared in the app's root QML,
- * which is the same reason helper objects would go here rather than there.
+ * The organisation and application names are NOT set here: sailjail sets
+ * them from the .desktop file, and they decide where LocalStorage, the
+ * account file and the cache live.
  */
 
-#ifdef QT_QML_DEBUG
 #include <QtQuick>
-#endif
-
-#include <QGuiApplication>
-#include <QQmlContext>
-#include <QQuickView>
-#include <QScopedPointer>
-#include <QString>
 
 #include <sailfishapp.h>
 
-// A build with no version passed in should say so rather than invent one.
+#include "account.h"
+#include "api.h"
+#include "authnam.h"
+#include "dav.h"
+
 #ifndef APP_VERSION
 #define APP_VERSION "0.0.0-dev"
 #endif
@@ -40,12 +31,24 @@
 int main(int argc, char *argv[])
 {
     QScopedPointer<QGuiApplication> app(SailfishApp::application(argc, argv));
+
+    Account account;
+    Api api;
+    Dav dav;
+    QObject::connect(&account, &Account::signedOut, &api, &Api::clearCache);
+
+    AuthNamFactory namFactory;
     QScopedPointer<QQuickView> view(SailfishApp::createView());
+    view->engine()->setNetworkAccessManagerFactory(&namFactory);
+    api.setEngine(view->engine());
+    dav.setEngine(view->engine());
 
-    view->rootContext()->setContextProperty("appVersion",
-                                            QString(QLatin1String(APP_VERSION)));
+    view->rootContext()->setContextProperty(QStringLiteral("appVersion"), QString::fromUtf8(APP_VERSION));
+    view->rootContext()->setContextProperty(QStringLiteral("account"), &account);
+    view->rootContext()->setContextProperty(QStringLiteral("api"), &api);
+    view->rootContext()->setContextProperty(QStringLiteral("dav"), &dav);
 
-    view->setSource(SailfishApp::pathTo("qml/harbour-fiatagenda.qml"));
+    view->setSource(SailfishApp::pathTo(QStringLiteral("qml/harbour-fiatagenda.qml")));
     view->show();
 
     return app->exec();

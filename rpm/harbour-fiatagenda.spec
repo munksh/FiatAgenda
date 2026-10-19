@@ -1,6 +1,6 @@
 Name:       harbour-fiatagenda
-Summary:    A fast, minimal task list
-Version:    1.2
+Summary:    Tasks and shared lists, synced with Nextcloud if you like
+Version:    2.0
 Release:    1
 License:    MIT
 URL:        https://github.com/munksh/FiatAgenda
@@ -10,6 +10,7 @@ BuildRequires:  pkgconfig(sailfishapp) >= 1.0.2
 BuildRequires:  pkgconfig(Qt5Core)
 BuildRequires:  pkgconfig(Qt5Qml)
 BuildRequires:  pkgconfig(Qt5Quick)
+BuildRequires:  pkgconfig(Qt5Network)
 BuildRequires:  desktop-file-utils
 
 # QtQuick.LocalStorage and Nemo.Configuration both ship with the OS. Do NOT
@@ -41,7 +42,7 @@ CAPTURE
 The field is always there at the bottom of the list. Type, press return, done
 -- under two seconds, with nothing you are forced to fill in. Capture inherits
 the view you are standing in: type in Today and the task is due today, type
-inside a list and it joins that list.
+in Upcoming and it is due tomorrow.
 
 THE VIEWS
 Today, Upcoming and Anytime are computed from the dates, never curated.
@@ -51,8 +52,7 @@ everything with no date, in the order you dragged them into.
 
 WHAT A TASK CAN HAVE
 A due date, and optionally a time. One level of subtasks -- enough to break a
-job into steps, not enough to build a tree. A note. A list to belong to. A
-repeat: daily, weekly, monthly or yearly, which advances to the next
+job into steps, not enough to build a tree. A note. A repeat: daily, weekly, monthly or yearly, which advances to the next
 occurrence when you tick it off rather than closing. Defer, to push something
 to tomorrow or next week without opening it.
 
@@ -60,6 +60,19 @@ Press and hold a task for its menu: today, tomorrow, done, delete. Drag to
 reorder wherever manual order makes sense. Completed tasks are kept on their
 own page. Deleting is a real delete, behind the standard remorse timer --
 there is no archive and no hidden copy.
+
+TASKS AND LISTS
+Two sides of one app. Tasks are yours: dates, times, repeats, subtasks. Lists
+are for the things that come back -- the shop, the packing, the house -- with
+quantities on the right and the shop's shelves as headings. Lists work on the
+phone on their own, or are shared with everyone in a household.
+
+NEXTCLOUD, IF YOU LIKE
+Connect your own Nextcloud and switch sync on: every task syncs both ways with
+Nextcloud Tasks, from every list there, so they are the same on the web, on a
+computer and on another phone. New tasks go to the list you choose. Shared
+lists come from Pantry, the household app for Nextcloud. Neither is needed;
+without them nothing leaves the phone.
 
 YOUR CALENDAR, IF YOU ASK
 Each task has two independent switches. One writes the task into your calendar
@@ -70,19 +83,21 @@ with both switches off never touches your calendar at all.
 
 FIAT COLOURS
 The app follows your ambience out of the box. One item in the pull-down menu
-switches it to Fiat colours instead: the family's own light paper and plum
+switches it to Fiat colours instead: the family's own light paper and brick
 accent, the same palette in every Fiat app. The choice is remembered.
 
 WHAT IT IS NOT
 Not a project manager. No time tracking, no pomodoro, no kanban board, no
-plugins, no shared projects, no sync service. If a feature would only matter
-to someone running work across a team, it is not here, and that is the design
-rather than a gap.
+plugins. If a feature would only matter to someone running work across a team,
+it is not here, and that is the design rather than a gap.
 
 YOUR DATA
-Everything stays on this phone, in one file. There is no account, no network
-access, and nothing is measured or reported. The only permission the app asks
-for is your calendar, used only for the switches described above.
+Tasks and the phone's own lists stay on this phone, in one file, unless you
+connect Nextcloud and switch sync on; then your tasks are also kept on your
+own server. A household's lists live in Pantry on the same server. Nothing
+goes anywhere else, and nothing is measured or reported. Permissions: Calendar,
+for the switches above; Internet, to reach your Nextcloud; Pictures, to add a
+photo to a list item.
 
 THE NAME
 Latin: agenda, the things that must be done. A plural, from agere, to do.
@@ -142,6 +157,17 @@ desktop-file-install --delete-original \
 %{_datadir}/icons/hicolor/*/apps/%{name}.png
 
 %changelog
+* Mon Oct 19 2026 Caesar Prometheus Ivarsson <caesar@munkstolen.se> - 2.0-1
+- Tasks and Lists: the front page has two sides. Lists are for the things
+  that come back, kept on the phone or shared with a household through
+  Pantry on your Nextcloud.
+- Tasks sync both ways with Nextcloud Tasks when switched on: every task,
+  from every list there. Tasks keep only Today, Upcoming and Anytime.
+- A new front: the day and a ring for what is done, times and repeats on the
+  right, and what was finished today under the list.
+- Pull down to sync or refresh, with a spinner while the server answers.
+- A Nextcloud page in the pull-down menu for the account and the sync.
+
 * Mon Oct 05 2026 Caesar Prometheus Ivarsson <caesar@munkstolen.se> - 1.2-1
 - The About page lists the whole fiat family with full-size icons, and the
   package carries metadata for SailfishOS:Chum: title, icon and screenshots.

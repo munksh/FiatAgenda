@@ -61,7 +61,7 @@ Page {
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatAgendaTheme.secondaryText
-                text: qsTr("It is not a project manager. If a feature would only matter to someone running work across a team, it is not here, and that is the whole design.")
+                text: qsTr("Lists is the other side: the things that come back, the shop, the packing, the house. They live on this phone, or are shared with everyone in a household through Pantry on your own Nextcloud. Tap to tick off, quantities on the right, the shelves as headings.")
             }
 
             // -- The name --------------------------------------------------
@@ -151,7 +151,7 @@ Page {
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatAgendaTheme.secondaryText
-                text: qsTr("Everything stays on this phone, in one file. There is no account, no network access, and nothing is measured or reported.")
+                text: qsTr("Tasks stay on this phone, in one file, unless you connect Nextcloud and switch sync on: then they are also kept on your own server, in Nextcloud Tasks, and changes go both ways. Lists made on the phone stay in the same file. A household's lists come from Pantry on the same server, and the phone keeps the last copy for reading offline. Nothing goes anywhere else, and nothing is measured or reported.")
             }
 
             Label {
@@ -160,7 +160,7 @@ Page {
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatAgendaTheme.secondaryText
-                text: qsTr("fiat agenda asks for one permission: your calendar. It is used only when you turn a task's own calendar switch on, and then only to write that one task's event into your default calendar, and to remove it again when the task changes or goes. A reminder rides on that event, which is why reminders still arrive when the app is closed. A task with the switch off never touches the calendar at all.")
+                text: qsTr("Connecting makes an app password for this phone, kept in the app's settings file. It can be withdrawn in Nextcloud under Security, and signing out withdraws it.")
             }
 
             Label {
@@ -170,6 +170,45 @@ Page {
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatAgendaTheme.secondaryText
                 text: qsTr("Delete means delete. There is no archive, no hidden copy and no bin to empty later. Completed tasks are kept, because a done task is still something you did, but a deleted one is gone.")
+            }
+
+            Label {
+                x: Theme.horizontalPageMargin
+                width: parent.width - Theme.horizontalPageMargin * 2
+                wrapMode: Text.WordWrap
+                font.pixelSize: Theme.fontSizeExtraSmall
+                color: FiatAgendaTheme.secondaryText
+                text: qsTr("Permissions: Calendar, only when a task's own calendar switch is on, to write that one task's event and remove it again; a reminder rides on that event, so it arrives with the app closed. Internet, to reach your Nextcloud. Pictures, to add a photo to a list item.")
+            }
+
+            SectionLabel {
+                x: Theme.horizontalPageMargin
+                text: qsTr("Built on")
+            }
+
+            BackgroundItem {
+                width: parent.width
+                height: builtCol.height + 2 * Theme.paddingSmall
+                highlightedColor: FiatAgendaTheme.highlightWash
+                onClicked: Qt.openUrlExternally("https://github.com/chenasraf/nextcloud-pantry")
+                Column {
+                    id: builtCol
+                    x: Theme.horizontalPageMargin
+                    width: parent.width - 2 * Theme.horizontalPageMargin
+                    anchors.verticalCenter: parent.verticalCenter
+                    Label {
+                        text: "Pantry"
+                        color: FiatAgendaTheme.primaryText
+                        font.pixelSize: Theme.fontSizeSmall
+                    }
+                    Label {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        text: qsTr("The Nextcloud app by Chen Asraf. fiat agenda talks to its open API; it is not made by the Pantry project.")
+                        color: FiatAgendaTheme.secondaryText
+                        font.pixelSize: Theme.fontSizeExtraSmall
+                    }
+                }
             }
 
             // -- Who ---------------------------------------------------------

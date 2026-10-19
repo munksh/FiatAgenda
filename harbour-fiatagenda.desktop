@@ -2,7 +2,7 @@
 Type=Application
 Icon=harbour-fiatagenda
 Name=fiat agenda
-Comment=A fast, minimal task list
+Comment=Tasks and shared lists, with Nextcloud if you like
 Exec=/usr/bin/sailjail -p harbour-fiatagenda.desktop /usr/bin/harbour-fiatagenda
 
 # NOTE: there is deliberately no X-Nemo-Application-Type line.
@@ -48,7 +48,10 @@ Exec=/usr/bin/sailjail -p harbour-fiatagenda.desktop /usr/bin/harbour-fiatagenda
 #
 # Notifications and Alarms are still not here. The reminder rides on the
 # calendar event and the system fires it.
-Permissions=Calendar;Privileged
+#
+# Internet reaches the user's own Nextcloud (Nextcloud Tasks and Pantry), and
+# Pictures lets the image picker hand over a photo for a list item.
+Permissions=Calendar;Privileged;Internet;Pictures
 
 # These two decide the app's private data directory, and sailjail sets
 # QCoreApplication's organization and application names FROM THEM:

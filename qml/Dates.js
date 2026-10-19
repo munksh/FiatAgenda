@@ -124,6 +124,36 @@ function formatFull(dueISO) {
            MONTH_NAMES[d.getMonth()] + " " + d.getFullYear()
 }
 
+// For the face at the top of the Tasks side.
+var DAY_LONG   = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+var MONTH_LONG = ["January", "February", "March", "April", "May", "June",
+                  "July", "August", "September", "October", "November", "December"]
+
+function weekdayLong(d) { return DAY_LONG[d.getDay()] }
+function monthLong(d)   { return MONTH_LONG[d.getMonth()] }
+
+// ISO 8601: weeks start on Monday, week 1 holds the year's first Thursday.
+function isoWeek(d) {
+    var t = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12)
+    t.setDate(t.getDate() + 3 - (t.getDay() + 6) % 7)
+    var jan4 = new Date(t.getFullYear(), 0, 4, 12)
+    return 1 + Math.round(((t.getTime() - jan4.getTime()) / 86400000 - 3 + (jan4.getDay() + 6) % 7) / 7)
+}
+
+// How long a late task has been late, on the right of its row.
+function formatSince(dueISO) {
+    var d = fromISO(dueISO)
+    if (d === null) return ""
+    var delta = daysBetween(todayISO(), dueISO)
+    if (delta === -1) return "since yesterday"
+    if (delta < -1 && delta > -7) return "since " + DAY_NAMES[d.getDay()]
+    if (d.getFullYear() === today().getFullYear()) return "since " + d.getDate() + " " + MONTH_NAMES[d.getMonth()]
+    return "since " + d.getDate() + " " + MONTH_NAMES[d.getMonth()] + " " + d.getFullYear()
+}
+
+// Start of today in milliseconds, which is how doneAt is stored.
+function startOfTodayMs() { return today().getTime() }
+
 function formatTime(h, m) { return pad(h) + ":" + pad(m) }
 
 function formatRepeat(every, unit) {
