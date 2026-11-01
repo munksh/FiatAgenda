@@ -6,20 +6,34 @@ import "../components"
 import "../Storage.js" as Storage
 import "../Dates.js" as Dates
 
-// The front page, in two modes. Tasks: yours, with dates, kept on the phone
-// and synced with Nextcloud Tasks if you like. Lists: the things that come
-// back, on the phone or shared with a household through Pantry on Nextcloud.
+// The front page: your tasks, with dates, kept on the phone and synced with
+// Nextcloud Tasks if you like. Lists lived here in 2.0; they have moved to
+// fiat penus, and a note at the top says so until it has been read.
 
 Page {
     id: page
 
-    readonly property string mode: modeConfig.value === "lists" ? "lists" : "tasks"
-    function setMode(m) { modeConfig.value = m }
-
+    // Read only: "lists" means this phone used the Lists side in 2.0.
     ConfigurationValue {
         id: modeConfig
         key: "/apps/harbour-fiatagenda/mode"
         defaultValue: "tasks"
+    }
+    // "" until the note about the move has been answered; "moved" once the
+    // phone's lists are saved for fiat penus, "seen" once it was read.
+    ConfigurationValue {
+        id: listsNoticeConfig
+        key: "/apps/harbour-fiatagenda/listsNotice"
+        defaultValue: ""
+    }
+    property int oldLists: 0
+    property bool notNow: false
+    readonly property bool listsToMove: oldLists > 0 && listsNoticeConfig.value !== "moved"
+    readonly property bool showListsNotice: !notNow && (listsToMove
+        || (listsNoticeConfig.value === "" && (account.signedIn || modeConfig.value === "lists")))
+
+    function openMoveLists() {
+        pageStack.animatorPush(Qt.resolvedUrl("MoveListsPage.qml"))
     }
     ConfigurationValue {
         id: introConfig
@@ -51,6 +65,7 @@ Page {
     function reload() {
         if (app !== null) app.syncSoon()
         now = new Date()
+        oldLists = Storage.shelfCount()
         Storage.loadTasks(taskModel, view, "")
         if (view === "today") Storage.loadDoneToday(doneModel)
         else doneModel.clear()
@@ -103,7 +118,6 @@ Page {
         anchors.bottomMargin: capture.height
         model: taskModel
         clip: true
-        visible: page.mode === "tasks"
 
         PullDownMenu {
             highlightColor: FiatAgendaTheme.accent
@@ -129,6 +143,12 @@ Page {
                 onClicked: pageStack.animatorPush(Qt.resolvedUrl("CompletedPage.qml"))
             }
             MenuItem {
+                visible: page.oldLists > 0
+                text: qsTr("Lists to fiat penus")
+                color: FiatAgendaTheme.primaryText
+                onClicked: page.openMoveLists()
+            }
+            MenuItem {
                 visible: page.app !== null && page.app.tasksSync
                 text: qsTr("Sync now")
                 color: FiatAgendaTheme.primaryText
@@ -141,24 +161,57 @@ Page {
                 width: page.width
                 spacing: Theme.paddingMedium
 
-                ModeHead {
-                    mode: page.mode
-                    onChosen: page.setMode(mode)
-                }
+                Wordmark { }
 
                 SyncSpinner { running: page.syncAsked }
 
-                // Once, after the update: what is new, and where it lives.
+                // After 2.1: the lists have moved. Said until it is answered,
+                // and for as long as there are lists here still to move.
                 Column {
                     x: Theme.horizontalPageMargin
                     width: page.width - Theme.horizontalPageMargin * 2
                     spacing: Theme.paddingSmall
-                    visible: !page.introduced && !account.signedIn
+                    visible: page.showListsNotice
 
                     Label {
                         width: parent.width
                         wrapMode: Text.WordWrap
-                        text: qsTr("New: Lists, for the things that come back. They work on this phone, and can be shared with your household through Pantry on Nextcloud. Tasks can sync with Nextcloud Tasks. Both are optional.")
+                        text: page.listsToMove
+                              ? qsTr("Lists have moved to fiat penus, the family's app for a household's lists, notes and photos. The lists you made here are kept, and can go with you.")
+                              : qsTr("Lists have moved to fiat penus, the family's app for a household's lists, notes and photos. Pantry's lists are there when you sign in to the same Nextcloud.")
+                        color: FiatAgendaTheme.primaryText
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.family: FiatAgendaTheme.serif
+                    }
+                    Row {
+                        spacing: Theme.paddingLarge
+                        LinkText {
+                            visible: page.listsToMove
+                            text: qsTr("Move them")
+                            onClicked: page.openMoveLists()
+                        }
+                        LinkText {
+                            text: page.listsToMove ? qsTr("Not now") : qsTr("Got it")
+                            color: page.listsToMove ? FiatAgendaTheme.secondaryText : FiatAgendaTheme.accent
+                            onClicked: {
+                                if (page.listsToMove) page.notNow = true
+                                else listsNoticeConfig.value = "seen"
+                            }
+                        }
+                    }
+                }
+
+                // Once, for someone new: what Nextcloud is for.
+                Column {
+                    x: Theme.horizontalPageMargin
+                    width: page.width - Theme.horizontalPageMargin * 2
+                    spacing: Theme.paddingSmall
+                    visible: !page.introduced && !account.signedIn && !page.showListsNotice
+
+                    Label {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        text: qsTr("Tasks can sync with Nextcloud Tasks on your own server. It is optional: without it, everything stays on this phone.")
                         color: FiatAgendaTheme.primaryText
                         font.pixelSize: Theme.fontSizeSmall
                         font.family: FiatAgendaTheme.serif
@@ -357,18 +410,9 @@ Page {
         VerticalScrollDecorator { }
     }
 
-
-    HouseholdView {
-        id: households
-        anchors.fill: parent
-        visible: page.mode === "lists"
-        active: page.mode === "lists" && page.status === PageStatus.Active
-        onModeChosen: page.setMode(mode)
-        onNextcloudWanted: page.openNextcloud()
-    }
-
     EmptyNote {
-        enabled: taskModel.count === 0 && page.mode === "tasks"
+        enabled: taskModel.count === 0
+        below: taskList.headerItem ? taskList.headerItem.height : 0
                  && !(page.view === "today" && doneModel.count > 0)
         text: page.view === "today"    ? qsTr("Nothing due today")
             : page.view === "upcoming" ? qsTr("Nothing ahead")
@@ -382,8 +426,7 @@ Page {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: page.mode === "tasks" ? field.height : 0
-        visible: page.mode === "tasks"
+        height: field.height
 
         Rectangle {
             anchors.fill: parent
@@ -440,7 +483,7 @@ Page {
     }
 
     ActivityLine {
-        running: (api.busy > 0 || dav.busy) && !page.syncAsked && !households.refreshAsked
+        running: dav.busy && !page.syncAsked
     }
 
     function commitCapture() {

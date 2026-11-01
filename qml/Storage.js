@@ -725,235 +725,36 @@ function pendingCount() {
     return n
 }
 
-// ---------------------------------------------------- lists on the phone --
+// ------------------------------------------------- lists, moving out --
 //
-// The phone's own household. Everything comes back in the shape Pantry sends,
-// so the Lists pages cannot tell the two apart. Shelf.js does the routing.
+// Agenda 2.0 kept lists of its own on the phone. They live in fiat penus now;
+// the tables stay, so nothing anyone made is lost, and are only read here to
+// be handed over. Never write to them again.
 
-function nowSeconds() { return Math.floor(new Date().getTime() / 1000) }
-
-function shelfList(r) {
-    return { id: r.id, houseId: -1, name: text(r.name), description: text(r.description),
-             color: text(r.color), icon: "", sortOrder: r.sortOrder, canEdit: true,
-             createdAt: r.createdAt, updatedAt: r.updatedAt }
-}
-
-function shelfItem(r) {
-    return { id: r.id, listId: r.listId, name: text(r.name), description: text(r.description),
-             quantity: text(r.quantity), categoryId: r.categoryId > 0 ? r.categoryId : null,
-             done: r.done === 1, doneAt: r.doneAt > 0 ? r.doneAt : null, rrule: text(r.rrule),
-             repeatFromCompletion: r.repeatFromCompletion === 1, deleteOnDone: r.deleteOnDone === 1,
-             nextDueAt: r.nextDueAt > 0 ? r.nextDueAt : null, imageFileId: null, addedBy: "",
-             sortOrder: r.sortOrder, createdAt: r.createdAt, updatedAt: r.updatedAt }
-}
-
-function shelfCategory(r) {
-    return { id: r.id, houseId: -1, listId: r.listId > 0 ? r.listId : null, name: text(r.name),
-             color: text(r.color), icon: text(r.icon), sortOrder: r.sortOrder, createdAt: r.createdAt }
-}
-
-var ITEM_COLUMNS = "id, listId, name, IFNULL(description,'') AS description, IFNULL(quantity,'') AS quantity, categoryId, done, doneAt, IFNULL(rrule,'') AS rrule, repeatFromCompletion, deleteOnDone, nextDueAt, sortOrder, createdAt, updatedAt"
-
-function shelfRow(table, id, wrap) {
-    var out = null
+function shelfCount() {
+    var n = 0
     db().readTransaction(function (tx) {
-        var cols = table === "shelf_items" ? ITEM_COLUMNS : "*"
-        var rs = tx.executeSql("SELECT " + cols + " FROM " + table + " WHERE id = ?", [id])
-        if (rs.rows.length > 0) out = wrap(rs.rows.item(0))
+        n = tx.executeSql("SELECT COUNT(*) AS n FROM shelf_lists", []).rows.item(0).n
+    })
+    return n
+}
+
+// Every list, item and category as they are, ids and all; fiat penus gives
+// them ids of its own and keeps which belongs to which.
+function shelfExport() {
+    var out = { format: "fiat-shelf", version: 1, from: "fiat agenda",
+                exportedAt: Math.floor(new Date().getTime() / 1000),
+                lists: [], items: [], categories: [] }
+    db().readTransaction(function (tx) {
+        var tables = [["shelf_lists", out.lists], ["shelf_items", out.items], ["shelf_categories", out.categories]]
+        for (var t = 0; t < tables.length; t++) {
+            var rs = tx.executeSql("SELECT * FROM " + tables[t][0] + " ORDER BY id ASC", [])
+            for (var i = 0; i < rs.rows.length; i++) {
+                var r = rs.rows.item(i), copy = {}
+                for (var k in r) copy[k] = (r[k] === null || r[k] === undefined) ? "" : r[k]
+                tables[t][1].push(copy)
+            }
+        }
     })
     return out
-}
-
-// ---- lists ----
-
-function shelfLists() {
-    var out = []
-    db().readTransaction(function (tx) {
-        var rs = tx.executeSql("SELECT * FROM shelf_lists ORDER BY sortOrder ASC, id ASC", [])
-        for (var i = 0; i < rs.rows.length; i++) out.push(shelfList(rs.rows.item(i)))
-    })
-    return out
-}
-
-function shelfAddList(f) {
-    var now = nowSeconds(), id = 0
-    db().transaction(function (tx) {
-        var rs = tx.executeSql("SELECT IFNULL(MAX(sortOrder), -1) + 1 AS n FROM shelf_lists", [])
-        var ins = tx.executeSql("INSERT INTO shelf_lists (name, description, color, sortOrder, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)",
-                                [f.name || "", f.description || "", f.color || "", rs.rows.item(0).n, now, now])
-        id = parseInt(ins.insertId, 10)
-    })
-    return shelfRow("shelf_lists", id, shelfList)
-}
-
-function shelfUpdateList(id, f) {
-    var sets = [], args = []
-    var keys = ["name", "description", "color"]
-    for (var i = 0; i < keys.length; i++)
-        if (f[keys[i]] !== undefined) { sets.push(keys[i] + " = ?"); args.push(f[keys[i]] === null ? "" : String(f[keys[i]])) }
-    if (sets.length > 0) {
-        sets.push("updatedAt = ?"); args.push(nowSeconds()); args.push(id)
-        db().transaction(function (tx) { tx.executeSql("UPDATE shelf_lists SET " + sets.join(", ") + " WHERE id = ?", args) })
-    }
-    return shelfRow("shelf_lists", id, shelfList)
-}
-
-function shelfDeleteList(id) {
-    db().transaction(function (tx) {
-        tx.executeSql("DELETE FROM shelf_items WHERE listId = ?", [id])
-        tx.executeSql("DELETE FROM shelf_categories WHERE listId = ?", [id])
-        tx.executeSql("DELETE FROM shelf_lists WHERE id = ?", [id])
-    })
-}
-
-// ---- items ----
-
-// A repeating item that was ticked off comes back on the day it is due again.
-function shelfRevive() {
-    var now = nowSeconds()
-    db().transaction(function (tx) {
-        tx.executeSql("UPDATE shelf_items SET done = 0, doneAt = 0, nextDueAt = 0, updatedAt = ? WHERE done = 1 AND nextDueAt > 0 AND nextDueAt <= ?", [now, now])
-    })
-}
-
-// listId 0 is every list.
-function shelfItems(listId) {
-    shelfRevive()
-    var out = []
-    db().readTransaction(function (tx) {
-        var rs = listId > 0
-            ? tx.executeSql("SELECT " + ITEM_COLUMNS + " FROM shelf_items WHERE listId = ? ORDER BY sortOrder ASC, id ASC", [listId])
-            : tx.executeSql("SELECT " + ITEM_COLUMNS + " FROM shelf_items ORDER BY listId ASC, sortOrder ASC, id ASC", [])
-        for (var i = 0; i < rs.rows.length; i++) out.push(shelfItem(rs.rows.item(i)))
-    })
-    return out
-}
-
-var ITEM_TEXT = ["name", "description", "quantity", "rrule"]
-var ITEM_FLAGS = ["repeatFromCompletion", "deleteOnDone"]
-
-function shelfAddItem(listId, f) {
-    var now = nowSeconds(), id = 0
-    db().transaction(function (tx) {
-        var rs = tx.executeSql("SELECT IFNULL(MAX(sortOrder), -1) + 1 AS n FROM shelf_items WHERE listId = ?", [listId])
-        var ins = tx.executeSql("INSERT INTO shelf_items (listId, name, description, quantity, categoryId, rrule, repeatFromCompletion, deleteOnDone, sortOrder, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                [listId, f.name || "", f.description || "", f.quantity || "", f.categoryId > 0 ? f.categoryId : 0,
-                                 f.rrule || "", f.repeatFromCompletion ? 1 : 0, f.deleteOnDone ? 1 : 0, rs.rows.item(0).n, now, now])
-        id = parseInt(ins.insertId, 10)
-    })
-    return shelfRow("shelf_items", id, shelfItem)
-}
-
-// "" clears a text, categoryId 0 clears the category: the same rules as Pantry.
-function shelfUpdateItem(id, f) {
-    var sets = [], args = []
-    for (var i = 0; i < ITEM_TEXT.length; i++)
-        if (f[ITEM_TEXT[i]] !== undefined) { sets.push(ITEM_TEXT[i] + " = ?"); args.push(f[ITEM_TEXT[i]] === null ? "" : String(f[ITEM_TEXT[i]])) }
-    for (var j = 0; j < ITEM_FLAGS.length; j++)
-        if (f[ITEM_FLAGS[j]] !== undefined) { sets.push(ITEM_FLAGS[j] + " = ?"); args.push(f[ITEM_FLAGS[j]] ? 1 : 0) }
-    if (f.categoryId !== undefined) { sets.push("categoryId = ?"); args.push(f.categoryId > 0 ? f.categoryId : 0) }
-    // A changed rule starts counting again from now.
-    if (f.rrule !== undefined) sets.push("nextDueAt = CASE WHEN done = 1 THEN nextDueAt ELSE 0 END")
-    if (sets.length > 0) {
-        sets.push("updatedAt = ?"); args.push(nowSeconds()); args.push(id)
-        db().transaction(function (tx) { tx.executeSql("UPDATE shelf_items SET " + sets.join(", ") + " WHERE id = ?", args) })
-    }
-    return shelfRow("shelf_items", id, shelfItem)
-}
-
-function shelfDeleteItems(ids) {
-    db().transaction(function (tx) {
-        for (var i = 0; i < ids.length; i++) tx.executeSql("DELETE FROM shelf_items WHERE id = ?", [ids[i]])
-    })
-}
-
-// The next time a repeating item is wanted: the rule's step from now, at the
-// start of that day.
-function shelfNextDue(rrule, fromSeconds) {
-    var freq = "", interval = 1
-    var parts = text(rrule).replace(/^RRULE:/, "").split(";")
-    for (var i = 0; i < parts.length; i++) {
-        var kv = parts[i].split("=")
-        var k = (kv[0] || "").toUpperCase(), v = (kv[1] || "").toUpperCase()
-        if (k === "FREQ") freq = v
-        else if (k === "INTERVAL") interval = Math.max(1, parseInt(v, 10) || 1)
-    }
-    if (freq === "") return 0
-    var d = new Date(fromSeconds * 1000)
-    d.setHours(0, 0, 0, 0)
-    var iso = Dates.iso(d)
-    if (freq === "DAILY") iso = Dates.advance(iso, interval, "day")
-    else if (freq === "WEEKLY") iso = Dates.advance(iso, interval, "week")
-    else if (freq === "MONTHLY") iso = Dates.advance(iso, interval, "month")
-    else if (freq === "YEARLY") iso = Dates.advance(iso, interval * 12, "month")
-    else return 0
-    return Math.floor(Dates.fromISO(iso).getTime() / 1000)
-}
-
-// Answers like Pantry's toggle: the item as it is now, or, for one that goes
-// away when done, its id with deletedAt.
-function shelfToggle(id) {
-    var it = shelfRow("shelf_items", id, shelfItem)
-    if (it === null) return null
-    var now = nowSeconds()
-    if (!it.done && it.deleteOnDone && it.rrule === "") {
-        shelfDeleteItems([id])
-        return { id: id, deletedAt: now }
-    }
-    db().transaction(function (tx) {
-        if (it.done)
-            tx.executeSql("UPDATE shelf_items SET done = 0, doneAt = 0, nextDueAt = 0, updatedAt = ? WHERE id = ?", [now, id])
-        else
-            tx.executeSql("UPDATE shelf_items SET done = 1, doneAt = ?, nextDueAt = ?, updatedAt = ? WHERE id = ?", [now, shelfNextDue(it.rrule, now), now, id])
-    })
-    return shelfRow("shelf_items", id, shelfItem)
-}
-
-function shelfUncheck(ids) {
-    var now = nowSeconds()
-    db().transaction(function (tx) {
-        for (var i = 0; i < ids.length; i++)
-            tx.executeSql("UPDATE shelf_items SET done = 0, doneAt = 0, nextDueAt = 0, updatedAt = ? WHERE id = ?", [now, ids[i]])
-    })
-}
-
-// ---- categories ----
-
-function shelfCategories() {
-    var out = []
-    db().readTransaction(function (tx) {
-        var rs = tx.executeSql("SELECT * FROM shelf_categories ORDER BY sortOrder ASC, id ASC", [])
-        for (var i = 0; i < rs.rows.length; i++) out.push(shelfCategory(rs.rows.item(i)))
-    })
-    return out
-}
-
-function shelfAddCategory(f) {
-    var now = nowSeconds(), id = 0
-    db().transaction(function (tx) {
-        var rs = tx.executeSql("SELECT IFNULL(MAX(sortOrder), -1) + 1 AS n FROM shelf_categories", [])
-        var ins = tx.executeSql("INSERT INTO shelf_categories (listId, name, color, icon, sortOrder, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
-                                [f.listId > 0 ? f.listId : 0, f.name || "", f.color || "", f.icon || "", rs.rows.item(0).n, now])
-        id = parseInt(ins.insertId, 10)
-    })
-    return shelfRow("shelf_categories", id, shelfCategory)
-}
-
-function shelfUpdateCategory(id, f) {
-    var sets = [], args = []
-    var keys = ["name", "color", "icon"]
-    for (var i = 0; i < keys.length; i++)
-        if (f[keys[i]] !== undefined) { sets.push(keys[i] + " = ?"); args.push(f[keys[i]] === null ? "" : String(f[keys[i]])) }
-    if (sets.length > 0) {
-        args.push(id)
-        db().transaction(function (tx) { tx.executeSql("UPDATE shelf_categories SET " + sets.join(", ") + " WHERE id = ?", args) })
-    }
-    return shelfRow("shelf_categories", id, shelfCategory)
-}
-
-function shelfDeleteCategory(id) {
-    db().transaction(function (tx) {
-        tx.executeSql("UPDATE shelf_items SET categoryId = 0 WHERE categoryId = ?", [id])
-        tx.executeSql("DELETE FROM shelf_categories WHERE id = ?", [id])
-    })
 }

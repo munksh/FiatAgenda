@@ -19,6 +19,9 @@ Item {
     property bool enabled: false
     property string text: ""
     property string hintText: ""
+    // Where the page's own header ends, when it has one: the note never sits
+    // on top of it, however tall a notice above the list has made it.
+    property real below: 0
 
     anchors.fill: parent
     visible: root.enabled
@@ -27,7 +30,7 @@ Item {
 
     Column {
         anchors.horizontalCenter: parent.horizontalCenter
-        y: parent.height * 0.28
+        y: Math.max(parent.height * 0.28, root.below + Theme.paddingLarge * 2)
         width: parent.width - Theme.horizontalPageMargin * 4
         spacing: Theme.paddingLarge
 

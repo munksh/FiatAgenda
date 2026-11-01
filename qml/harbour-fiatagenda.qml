@@ -1,5 +1,5 @@
 /*
- * Fiat Agenda -- your tasks, and the household's lists.
+ * Fiat Agenda -- your tasks.
  *
  * Part of the Munkstolen Fiat family. The Fiat colours standard lives in
  * FiatAgendaTheme. Besides handing Silica's chrome the palette, this file
@@ -46,10 +46,8 @@ ApplicationWindow {
         // Once, here: palette is inherited, so every Silica control in every
         // page below picks it up.
         FiatAgendaTheme.applyPalette(app)
-        if (account.signedIn) {
-            account.checkPantry()
+        if (account.signedIn)
             syncNow()
-        }
     }
 
     Connections {
@@ -216,14 +214,9 @@ ApplicationWindow {
         nextcloudNotice = qsTr("The server no longer accepts this phone's sign-in. Connect again to go on syncing.")
         signOut()
     }
-    Connections { target: api; onUnauthorized: app.lostSignIn() }
     Connections { target: dav; onUnauthorized: app.lostSignIn() }
     Connections {
         target: account
-        onSignedInNow: {
-            app.nextcloudNotice = ""
-            account.checkPantry()
-        }
-        onPantryChanged: if (account.pantryState === "unauthorized") app.lostSignIn()
+        onSignedInNow: app.nextcloudNotice = ""
     }
 }

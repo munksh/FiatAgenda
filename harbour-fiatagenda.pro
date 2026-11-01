@@ -6,17 +6,17 @@ QT += network
 SOURCES += \
     src/harbour-fiatagenda.cpp \
     src/account.cpp \
-    src/api.cpp \
     src/authnam.cpp \
     src/credentials.cpp \
-    src/dav.cpp
+    src/dav.cpp \
+    src/files.cpp
 
 HEADERS += \
     src/account.h \
-    src/api.h \
     src/authnam.h \
     src/credentials.h \
-    src/dav.h
+    src/dav.h \
+    src/files.h
 
 DISTFILES += \
     qml/harbour-fiatagenda.qml \
@@ -25,8 +25,6 @@ DISTFILES += \
     qml/Storage.js \
     qml/Dates.js \
     qml/Sync.js \
-    qml/Pantry.js \
-    qml/Shelf.js \
     qml/components/FiatBackground.qml \
     qml/components/PageHead.qml \
     qml/components/Wordmark.qml \
@@ -38,12 +36,7 @@ DISTFILES += \
     qml/components/TaskRow.qml \
     qml/components/CalendarBridge.qml \
     qml/components/MunkstolenMark.qml \
-    qml/components/ModeHead.qml \
-    qml/components/HouseholdView.qml \
-    qml/components/Choice.qml \
     qml/components/Mark.qml \
-    qml/components/ColourChoice.qml \
-    qml/components/ErrorLine.qml \
     qml/components/ActivityLine.qml \
     qml/components/LinkText.qml \
     qml/components/FiatButton.qml \
@@ -68,13 +61,7 @@ DISTFILES += \
     qml/pages/AboutPage.qml \
     qml/pages/NextcloudPage.qml \
     qml/pages/AppPasswordDialog.qml \
-    qml/pages/PantryListPage.qml \
-    qml/pages/PantryItemDialog.qml \
-    qml/pages/PantryListDialog.qml \
-    qml/pages/CategoryPickerPage.qml \
-    qml/pages/CategoryDialog.qml \
-    qml/pages/HouseholdsPage.qml \
-    qml/pages/HouseholdDialog.qml \
+    qml/pages/MoveListsPage.qml \
     qml/cover/CoverPage.qml \
     rpm/harbour-fiatagenda.spec \
     harbour-fiatagenda.desktop
@@ -100,8 +87,6 @@ REQUIRED_FILES = \
     qml/Storage.js \
     qml/Dates.js \
     qml/Sync.js \
-    qml/Pantry.js \
-    qml/Shelf.js \
     LICENSE
 
 for(f, REQUIRED_FILES) {

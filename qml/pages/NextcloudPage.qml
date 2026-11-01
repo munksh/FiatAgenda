@@ -4,10 +4,9 @@ import ".."
 import "../components"
 import "../Storage.js" as Storage
 
-// Nextcloud: the account, and the two things it is for. Tasks sync with
-// Nextcloud Tasks, all of them, from every list there. Lists can come from
-// Pantry. Neither is needed;
-// without them everything stays on this phone.
+// Nextcloud: the account, and what it is for. Tasks sync with Nextcloud
+// Tasks, all of them, from every list there. None of it is needed; without
+// it everything stays on this phone.
 Page {
     id: page
 
@@ -136,7 +135,7 @@ Page {
                 x: Theme.horizontalPageMargin
                 width: parent.width - Theme.horizontalPageMargin * 2
                 wrapMode: Text.WordWrap
-                text: qsTr("Your tasks can sync with Nextcloud Tasks, and Lists shows the household's shopping lists from Pantry. Both live on your own Nextcloud. Neither is needed: without them, everything stays on this phone.")
+                text: qsTr("Your tasks can sync with Nextcloud Tasks, on your own server. It is not needed: without it, everything stays on this phone.")
                 color: FiatAgendaTheme.primaryText
                 font.pixelSize: Theme.fontSizeSmall
                 font.family: FiatAgendaTheme.serif
@@ -349,27 +348,9 @@ Page {
                 width: parent.width - Theme.horizontalPageMargin * 2
                 visible: account.signedIn
                 wrapMode: Text.WordWrap
-                color: account.pantryState === "missing" || account.pantryState === "unreachable"
-                       ? FiatAgendaTheme.wrong : FiatAgendaTheme.secondaryText
+                text: qsTr("The household's lists from Pantry are in fiat penus now, with its notes and photos. Sign in there to the same Nextcloud.")
+                color: FiatAgendaTheme.secondaryText
                 font.pixelSize: Theme.fontSizeSmall
-                text: {
-                    switch (account.pantryState) {
-                    case "present":
-                        return qsTr("Pantry %1 is on the server. The household's lists are under Lists on the front page.").arg(account.pantryVersion)
-                    case "missing":
-                        return qsTr("Pantry is not installed on this server. Someone with admin rights can add it from the Nextcloud app store.")
-                    case "unreachable":
-                        return qsTr("The server cannot be reached right now.")
-                    default:
-                        return qsTr("Looking for Pantry on the server…")
-                    }
-                }
-            }
-            LinkText {
-                x: Theme.horizontalPageMargin - Theme.paddingSmall
-                visible: account.signedIn && account.pantryState !== "present" && account.pantryState !== "checking"
-                text: qsTr("Look again")
-                onClicked: account.checkPantry()
             }
 
             Item { width: 1; height: Theme.paddingLarge; visible: account.signedIn }
@@ -388,6 +369,6 @@ Page {
     }
 
     ActivityLine {
-        running: api.busy > 0 || dav.busy || page.looking
+        running: dav.busy || page.looking
     }
 }

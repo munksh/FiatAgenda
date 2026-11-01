@@ -61,7 +61,7 @@ Page {
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatAgendaTheme.secondaryText
-                text: qsTr("Lists is the other side: the things that come back, the shop, the packing, the house. They live on this phone, or are shared with everyone in a household through Pantry on your own Nextcloud. Tap to tick off, quantities on the right, the shelves as headings.")
+                text: qsTr("Lists, the things that come back, the shop, the packing, the house, have moved to fiat penus, beside the household's notes and photos. Agenda keeps to the things that must be done.")
             }
 
             // -- The name --------------------------------------------------
@@ -151,7 +151,7 @@ Page {
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatAgendaTheme.secondaryText
-                text: qsTr("Tasks stay on this phone, in one file, unless you connect Nextcloud and switch sync on: then they are also kept on your own server, in Nextcloud Tasks, and changes go both ways. Lists made on the phone stay in the same file. A household's lists come from Pantry on the same server, and the phone keeps the last copy for reading offline. Nothing goes anywhere else, and nothing is measured or reported.")
+                text: qsTr("Tasks stay on this phone, in one file, unless you connect Nextcloud and switch sync on: then they are also kept on your own server, in Nextcloud Tasks, and changes go both ways. Nothing goes anywhere else, and nothing is measured or reported.")
             }
 
             Label {
@@ -178,37 +178,7 @@ Page {
                 wrapMode: Text.WordWrap
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: FiatAgendaTheme.secondaryText
-                text: qsTr("Permissions: Calendar, only when a task's own calendar switch is on, to write that one task's event and remove it again; a reminder rides on that event, so it arrives with the app closed. Internet, to reach your Nextcloud. Pictures, to add a photo to a list item.")
-            }
-
-            SectionLabel {
-                x: Theme.horizontalPageMargin
-                text: qsTr("Built on")
-            }
-
-            BackgroundItem {
-                width: parent.width
-                height: builtCol.height + 2 * Theme.paddingSmall
-                highlightedColor: FiatAgendaTheme.highlightWash
-                onClicked: Qt.openUrlExternally("https://github.com/chenasraf/nextcloud-pantry")
-                Column {
-                    id: builtCol
-                    x: Theme.horizontalPageMargin
-                    width: parent.width - 2 * Theme.horizontalPageMargin
-                    anchors.verticalCenter: parent.verticalCenter
-                    Label {
-                        text: "Pantry"
-                        color: FiatAgendaTheme.primaryText
-                        font.pixelSize: Theme.fontSizeSmall
-                    }
-                    Label {
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        text: qsTr("The Nextcloud app by Chen Asraf. fiat agenda talks to its open API; it is not made by the Pantry project.")
-                        color: FiatAgendaTheme.secondaryText
-                        font.pixelSize: Theme.fontSizeExtraSmall
-                    }
-                }
+                text: qsTr("Permissions: Calendar, only when a task's own calendar switch is on, to write that one task's event and remove it again; a reminder rides on that event, so it arrives with the app closed. Internet, to reach your Nextcloud. Documents, only to save the lists from Agenda 2.0 for fiat penus.")
             }
 
             // -- Who ---------------------------------------------------------
@@ -301,16 +271,18 @@ Page {
             Repeater {
                 model: [
                     { name: "fiat agenda", what: qsTr("let there be doing — this one"), icon: "images/family/harbour-fiatagenda.png", url: "" },
-                    { name: "fiat margo", what: qsTr("let there be edge — keeps edges"), icon: "images/family/harbour-fiatmargo.png", url: "https://openrepos.net/content/munkstolen/fiat-margo-keeps-edges" },
-                    { name: "fiat glossa", what: qsTr("let there be tongue — a translator"), icon: "images/family/harbour-fiatglossa.png", url: "https://openrepos.net/content/munkstolen/fiat-glossa-a-deepl-translator" },
-                    { name: "fiat vox", what: qsTr("let there be voice — a chromatic tuner"), icon: "images/family/harbour-fiatvox.png", url: "https://openrepos.net/content/munkstolen/fiat-vox-chromatic-tuner" },
-                    { name: "fiat pons", what: qsTr("let there be bridge — a native Qobuz client"), icon: "images/family/harbour-fiatpons.png", url: "https://openrepos.net/content/munkstolen/fiat-pons-native-qobuz-client" },
-                    { name: "fiat lux", what: qsTr("let there be light — a light meter for film"), icon: "images/family/harbour-fiatlux.png", url: "https://openrepos.net/content/munkstolen/fiat-lux-lightmeter-film-photography" },
-                    { name: "fiat cor", what: qsTr("let there be heart — a metronome"), icon: "images/family/harbour-fiatcor.png", url: "https://openrepos.net/content/munkstolen/fiat-cor-a-metronome" },
+                    { name: "fiat margo", what: qsTr("let there be edge — keeps edges"), icon: "images/family/harbour-fiatmargo.png", url: "https://munkstolen.se" },
+                    { name: "fiat glossa", what: qsTr("let there be tongue — a translator"), icon: "images/family/harbour-fiatglossa.png", url: "https://munkstolen.se" },
+                    { name: "fiat vox", what: qsTr("let there be voice — a chromatic tuner"), icon: "images/family/harbour-fiatvox.png", url: "https://munkstolen.se" },
+                    { name: "fiat pons", what: qsTr("let there be bridge — a native Qobuz client"), icon: "images/family/harbour-fiatpons.png", url: "https://munkstolen.se" },
+                    { name: "fiat lux", what: qsTr("let there be light — a light meter for film"), icon: "images/family/harbour-fiatlux.png", url: "https://munkstolen.se" },
+                    { name: "fiat cor", what: qsTr("let there be heart — a metronome"), icon: "images/family/harbour-fiatcor.png", url: "https://munkstolen.se" },
                     { name: "fiat passus", what: qsTr("let there be step — a step counter - Coming soon"), icon: "images/family/harbour-fiatpassus.png", url: "" },
-                    { name: "fiat mos", what: qsTr("let there be habit — a habit tracker"), icon: "images/family/harbour-fiatmos.png", url: "https://openrepos.net/content/munkstolen/fiat-mos-habit-tracker" },
-                    { name: "fiat imago", what: qsTr("let there be image — a raw editor"), icon: "images/family/harbour-fiatimago.png", url: "https://openrepos.net/content/munkstolen/fiat-imago-raw-editor" },
-                    { name: "fiat ratio", what: qsTr("let there be reckoning — a budget tool"), icon: "images/family/harbour-fiatratio.png", url: "https://openrepos.net/content/munkstolen/fiat-ratio-budget-tool" }
+                    { name: "fiat mos", what: qsTr("let there be habit — a habit tracker"), icon: "images/family/harbour-fiatmos.png", url: "https://munkstolen.se" },
+                    { name: "fiat imago", what: qsTr("let there be image — a raw editor"), icon: "images/family/harbour-fiatimago.png", url: "https://munkstolen.se" },
+                    { name: "fiat ratio", what: qsTr("let there be reckoning — a budget tool"), icon: "images/family/harbour-fiatratio.png", url: "https://munkstolen.se" },
+                    { name: "fiat penus", what: qsTr("let there be provisions — a pantry client"), icon: "images/family/harbour-fiatpenus.png", url: "https://munkstolen.se" },
+                    { name: "fiat tessera", what: qsTr("let there be token — a card wallet"), icon: "images/family/harbour-fiattessera.png", url: "https://munkstolen.se" }
                 ]
 
                 // A full-size icon in a row of its own height, rather than an

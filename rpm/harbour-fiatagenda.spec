@@ -1,6 +1,6 @@
 Name:       harbour-fiatagenda
-Summary:    Tasks and shared lists, synced with Nextcloud if you like
-Version:    2.0
+Summary:    Tasks, synced with Nextcloud if you like
+Version:    2.1
 Release:    1
 License:    MIT
 URL:        https://github.com/munksh/FiatAgenda
@@ -61,18 +61,16 @@ reorder wherever manual order makes sense. Completed tasks are kept on their
 own page. Deleting is a real delete, behind the standard remorse timer --
 there is no archive and no hidden copy.
 
-TASKS AND LISTS
-Two sides of one app. Tasks are yours: dates, times, repeats, subtasks. Lists
-are for the things that come back -- the shop, the packing, the house -- with
-quantities on the right and the shop's shelves as headings. Lists work on the
-phone on their own, or are shared with everyone in a household.
+LISTS LIVE IN FIAT PENUS
+Lists, the things that come back -- the shop, the packing, the house -- have
+moved to fiat penus, beside the household's notes and photos. Lists made in
+Agenda 2.0 are kept, and one tap saves them for fiat penus to bring in.
 
 NEXTCLOUD, IF YOU LIKE
 Connect your own Nextcloud and switch sync on: every task syncs both ways with
 Nextcloud Tasks, from every list there, so they are the same on the web, on a
-computer and on another phone. New tasks go to the list you choose. Shared
-lists come from Pantry, the household app for Nextcloud. Neither is needed;
-without them nothing leaves the phone.
+computer and on another phone. New tasks go to the list you choose. None of
+it is needed; without it nothing leaves the phone.
 
 YOUR CALENDAR, IF YOU ASK
 Each task has two independent switches. One writes the task into your calendar
@@ -92,12 +90,11 @@ plugins. If a feature would only matter to someone running work across a team,
 it is not here, and that is the design rather than a gap.
 
 YOUR DATA
-Tasks and the phone's own lists stay on this phone, in one file, unless you
-connect Nextcloud and switch sync on; then your tasks are also kept on your
-own server. A household's lists live in Pantry on the same server. Nothing
-goes anywhere else, and nothing is measured or reported. Permissions: Calendar,
-for the switches above; Internet, to reach your Nextcloud; Pictures, to add a
-photo to a list item.
+Tasks stay on this phone, in one file, unless you connect Nextcloud and switch
+sync on; then they are also kept on your own server. Nothing goes anywhere
+else, and nothing is measured or reported. Permissions: Calendar, for the
+switches above; Internet, to reach your Nextcloud; Documents, only to save the
+lists from Agenda 2.0 for fiat penus.
 
 THE NAME
 Latin: agenda, the things that must be done. A plural, from agere, to do.
@@ -157,6 +154,15 @@ desktop-file-install --delete-original \
 %{_datadir}/icons/hicolor/*/apps/%{name}.png
 
 %changelog
+* Sun Nov 01 2026 Caesar Prometheus Ivarsson <caesar@munkstolen.se> - 2.1-1
+- Lists have moved to fiat penus, beside the household's notes and photos.
+  Agenda keeps to tasks, synced with Nextcloud Tasks if you like.
+- Lists made on the phone in 2.0 are kept: "Lists to fiat penus" in the
+  pull-down saves them in Documents, and fiat penus brings them in.
+- Pantry's shared lists need no moving: sign in to the same Nextcloud in
+  fiat penus.
+- Permissions: Documents instead of Pictures.
+
 * Mon Oct 19 2026 Caesar Prometheus Ivarsson <caesar@munkstolen.se> - 2.0-1
 - Tasks and Lists: the front page has two sides. Lists are for the things
   that come back, kept on the phone or shared with a household through

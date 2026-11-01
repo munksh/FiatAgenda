@@ -7,7 +7,7 @@ import ".."
 Item {
     id: root
 
-    property bool running: api.busy > 0
+    property bool running: dav.busy
 
     anchors.top: parent.top
     anchors.left: parent.left
